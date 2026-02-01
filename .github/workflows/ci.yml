@@ -76,12 +76,14 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
+      - name: Install dependencies
+        run: uv sync --extra dev
+
       - name: Build package
         run: uv build
 
       - name: Check package
-        run: |
-          uv run twine check dist/*
+        run: uv run twine check dist/*
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
