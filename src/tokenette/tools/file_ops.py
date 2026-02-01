@@ -81,8 +81,8 @@ class FileStructure:
 
 # Strategy thresholds (in bytes)
 STRATEGY_THRESHOLDS = {
-    "full": 5_000,       # < 5KB: read full
-    "partial": 50_000,   # < 50KB: partial (first + last chunks)
+    "full": 5_000,  # < 5KB: read full
+    "partial": 50_000,  # < 50KB: partial (first + last chunks)
     "summary": 500_000,  # < 500KB: AST summary
     # > 500KB: stream or reject
 }
@@ -93,31 +93,31 @@ async def read_file_smart(
     strategy: Literal["auto", "full", "partial", "summary", "ast"] = "auto",
     start_line: int | None = None,
     end_line: int | None = None,
-    ctx: Context | None = None
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """
     Read a file with intelligent strategy selection.
-    
+
     Strategies:
     - auto: Automatically select based on file size
     - full: Read entire file (for small files)
     - partial: Read specific lines or chunks
     - summary: AST-based summary (for code files)
     - ast: Return only structure (maximum savings)
-    
+
     Token savings:
     - Small files (<5KB): 0% (full read)
     - Medium files (5-50KB): 60-80% (partial)
     - Large files (50-500KB): 90-98% (summary/AST)
     - Huge files (>500KB): 99%+ (AST only)
-    
+
     Args:
         path: Path to the file
         strategy: Reading strategy
         start_line: Start line for partial reads
         end_line: End line for partial reads
         ctx: MCP context
-        
+
     Returns:
         Optimized file content with metadata
     """
@@ -159,10 +159,7 @@ async def read_file_smart(
         content = await _read_full(file_path)
 
     # Calculate result size
-    if isinstance(content, dict):
-        result_size = len(str(content))
-    else:
-        result_size = len(content)
+    result_size = len(str(content)) if isinstance(content, dict) else len(content)
 
     return {
         "path": path,
@@ -173,7 +170,7 @@ async def read_file_smart(
         "tokens_saved": (file_size - result_size) // 4,
         "savings_pct": round((1 - result_size / file_size) * 100, 1) if file_size > 0 else 0,
         "file_hash": file_hash,
-        "_format": "code" if isinstance(content, str) else "json"
+        "_format": "code" if isinstance(content, str) else "json",
     }
 
 
@@ -197,9 +194,7 @@ async def _read_full(path: Path) -> str:
 
 
 async def _read_partial(
-    path: Path,
-    start_line: int | None = None,
-    end_line: int | None = None
+    path: Path, start_line: int | None = None, end_line: int | None = None
 ) -> str:
     """Read specific lines from file."""
     async with aiofiles.open(path, encoding="utf-8", errors="replace") as f:
@@ -219,7 +214,9 @@ async def _read_partial(
         else:
             first_chunk = lines[:25]
             last_chunk = lines[-25:]
-            selected = first_chunk + [f"\n... ({total_lines - 50} lines omitted) ...\n"] + last_chunk
+            selected = (
+                first_chunk + [f"\n... ({total_lines - 50} lines omitted) ...\n"] + last_chunk
+            )
 
     return "".join(selected)
 
@@ -236,9 +233,9 @@ async def _read_summary(path: Path) -> dict[str, Any]:
     key_lines = _extract_key_lines(content)
 
     return {
-        "structure": structure.to_toon() if hasattr(structure, 'to_toon') else str(structure),
+        "structure": structure.to_toon() if hasattr(structure, "to_toon") else str(structure),
         "key_sections": key_lines,
-        "total_lines": content.count("\n") + 1
+        "total_lines": content.count("\n") + 1,
     }
 
 
@@ -262,37 +259,29 @@ async def _extract_structure(path: Path, content: str) -> FileStructure:
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     for alias in node.names:
-                        structure.imports.append({
-                            "name": alias.name,
-                            "line": node.lineno
-                        })
+                        structure.imports.append({"name": alias.name, "line": node.lineno})
                 elif isinstance(node, ast.ImportFrom):
                     module = node.module or ""
                     for alias in node.names:
-                        structure.imports.append({
-                            "name": f"{module}.{alias.name}",
-                            "line": node.lineno
-                        })
+                        structure.imports.append(
+                            {"name": f"{module}.{alias.name}", "line": node.lineno}
+                        )
                 elif isinstance(node, ast.ClassDef):
                     methods = [
                         {"name": m.name, "line": m.lineno}
                         for m in node.body
                         if isinstance(m, ast.FunctionDef)
                     ]
-                    structure.classes.append({
-                        "name": node.name,
-                        "line": node.lineno,
-                        "methods": methods
-                    })
+                    structure.classes.append(
+                        {"name": node.name, "line": node.lineno, "methods": methods}
+                    )
                 elif isinstance(node, ast.FunctionDef) and isinstance(node, ast.FunctionDef):
                     # Only top-level functions
-                    if hasattr(node, 'col_offset') and node.col_offset == 0:
+                    if hasattr(node, "col_offset") and node.col_offset == 0:
                         params = [arg.arg for arg in node.args.args]
-                        structure.functions.append({
-                            "name": node.name,
-                            "line": node.lineno,
-                            "params": params
-                        })
+                        structure.functions.append(
+                            {"name": node.name, "line": node.lineno, "params": params}
+                        )
         except SyntaxError:
             pass  # Fall back to regex-based extraction
 
@@ -315,18 +304,18 @@ def _extract_structure_regex(content: str, language: str) -> FileStructure:
         "python": {
             "function": r"^\s*(?:async\s+)?def\s+(\w+)\s*\(([^)]*)\)",
             "class": r"^\s*class\s+(\w+)",
-            "import": r"^(?:from\s+[\w.]+\s+)?import\s+([\w.,\s]+)"
+            "import": r"^(?:from\s+[\w.]+\s+)?import\s+([\w.,\s]+)",
         },
         "javascript": {
             "function": r"(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>",
             "class": r"class\s+(\w+)",
-            "import": r"import\s+(?:{[^}]+}|[\w]+)\s+from"
+            "import": r"import\s+(?:{[^}]+}|[\w]+)\s+from",
         },
         "typescript": {
             "function": r"(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)|(?:const|let)\s+(\w+)\s*(?::\s*\w+)?\s*=\s*(?:async\s+)?\([^)]*\)\s*=>",
             "class": r"class\s+(\w+)",
-            "import": r"import\s+(?:{[^}]+}|[\w]+)\s+from"
-        }
+            "import": r"import\s+(?:{[^}]+}|[\w]+)\s+from",
+        },
     }
 
     lang_patterns = patterns.get(language, patterns["javascript"])
@@ -336,26 +325,21 @@ def _extract_structure_regex(content: str, language: str) -> FileStructure:
         if match := re.search(lang_patterns.get("function", ""), line):
             name = match.group(1) or match.group(3) or "anonymous"
             params = (match.group(2) or "").split(",") if match.lastindex >= 2 else []
-            structure.functions.append({
-                "name": name,
-                "line": i,
-                "params": [p.strip().split(":")[0].strip() for p in params if p.strip()]
-            })
+            structure.functions.append(
+                {
+                    "name": name,
+                    "line": i,
+                    "params": [p.strip().split(":")[0].strip() for p in params if p.strip()],
+                }
+            )
 
         # Classes
         if match := re.search(lang_patterns.get("class", ""), line):
-            structure.classes.append({
-                "name": match.group(1),
-                "line": i,
-                "methods": []
-            })
+            structure.classes.append({"name": match.group(1), "line": i, "methods": []})
 
         # Imports (simplified)
         if re.search(lang_patterns.get("import", ""), line):
-            structure.imports.append({
-                "name": line.strip()[:50],
-                "line": i
-            })
+            structure.imports.append({"name": line.strip()[:50], "line": i})
 
     return structure
 
@@ -370,9 +354,14 @@ def _extract_key_lines(content: str) -> list[str]:
 
         # Docstrings and important comments
         if stripped.startswith('"""') or stripped.startswith("'''"):
-            key_lines.append(f"L{i+1}: {stripped[:80]}")
-        elif stripped.startswith("# TODO") or stripped.startswith("# FIXME") or stripped.startswith("// TODO") or stripped.startswith("// FIXME"):
-            key_lines.append(f"L{i+1}: {stripped}")
+            key_lines.append(f"L{i + 1}: {stripped[:80]}")
+        elif (
+            stripped.startswith("# TODO")
+            or stripped.startswith("# FIXME")
+            or stripped.startswith("// TODO")
+            or stripped.startswith("// FIXME")
+        ):
+            key_lines.append(f"L{i + 1}: {stripped}")
 
         # Limit to 20 key lines
         if len(key_lines) >= 20:
@@ -382,23 +371,20 @@ def _extract_key_lines(content: str) -> list[str]:
 
 
 async def write_file_diff(
-    path: str,
-    changes: str,
-    verify: bool = True,
-    ctx: Context | None = None
+    path: str, changes: str, verify: bool = True, ctx: Context | None = None
 ) -> dict[str, Any]:
     """
     Write file changes using unified diff format.
-    
+
     97% more token-efficient than sending full file content.
     Diff format: @@ -start,count +start,count @@
-    
+
     Args:
         path: Path to file
         changes: Changes in unified diff format
         verify: Verify file hash before applying
         ctx: MCP context
-        
+
     Returns:
         Result of write operation
     """
@@ -438,7 +424,7 @@ async def write_file_diff(
         "original_size": len(original_content),
         "new_size": len(new_content),
         "tokens_used": len(changes) // 4,
-        "tokens_saved": (len(new_content) - len(changes)) // 4
+        "tokens_saved": (len(new_content) - len(changes)) // 4,
     }
 
 
@@ -459,13 +445,13 @@ def _apply_diff(original_lines: list[str], diff: str) -> list[str]:
             break
 
         old_start = int(hunks[i]) - 1
-        old_count = int(hunks[i+1]) if hunks[i+1] else 1
-        new_start = int(hunks[i+2]) - 1
-        new_count = int(hunks[i+3]) if hunks[i+3] else 1
+        old_count = int(hunks[i + 1]) if hunks[i + 1] else 1
+        int(hunks[i + 2]) - 1
+        int(hunks[i + 3]) if hunks[i + 3] else 1
 
         # Get hunk content
         if i + 4 < len(hunks):
-            hunk_content = hunks[i+4] if not re.match(hunk_pattern, hunks[i+4]) else ""
+            hunk_content = hunks[i + 4] if not re.match(hunk_pattern, hunks[i + 4]) else ""
         else:
             hunk_content = ""
 
@@ -483,7 +469,7 @@ def _apply_diff(original_lines: list[str], diff: str) -> list[str]:
 
         # Apply changes
         adjusted_start = old_start + offset
-        result[adjusted_start:adjusted_start + old_count] = new_lines
+        result[adjusted_start : adjusted_start + old_count] = new_lines
 
         # Update offset
         offset += len(new_lines) - old_count
@@ -498,21 +484,21 @@ async def search_code_semantic(
     directory: str = ".",
     file_pattern: str | None = None,
     max_results: int = 10,
-    ctx: Context | None = None
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """
     Search code using semantic matching.
-    
+
     98% more efficient than grep for finding relevant code.
     Uses keyword extraction and relevance scoring.
-    
+
     Args:
         query: Natural language search query
         directory: Directory to search
         file_pattern: File glob pattern
         max_results: Maximum results
         ctx: MCP context
-        
+
     Returns:
         Ranked list of code snippets
     """
@@ -534,7 +520,11 @@ async def search_code_semantic(
     # Walk directory
     for root, dirs, files in os.walk(dir_path):
         # Skip common non-code directories
-        dirs[:] = [d for d in dirs if d not in {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}]
+        dirs[:] = [
+            d
+            for d in dirs
+            if d not in {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+        ]
 
         for file in files:
             # Apply file pattern
@@ -542,7 +532,21 @@ async def search_code_semantic(
                 continue
 
             # Skip non-code files
-            if not any(file.endswith(ext) for ext in [".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs", ".rb", ".php"]):
+            if not any(
+                file.endswith(ext)
+                for ext in [
+                    ".py",
+                    ".js",
+                    ".ts",
+                    ".jsx",
+                    ".tsx",
+                    ".java",
+                    ".go",
+                    ".rs",
+                    ".rb",
+                    ".php",
+                ]
+            ):
                 continue
 
             file_path = Path(root) / file
@@ -564,22 +568,22 @@ async def search_code_semantic(
 
                 if line_score > 0:
                     score += line_score
-                    matching_lines.append({
-                        "line": i,
-                        "content": line.strip()[:100],
-                        "score": line_score
-                    })
+                    matching_lines.append(
+                        {"line": i, "content": line.strip()[:100], "score": line_score}
+                    )
 
             if score > 0:
                 # Sort matching lines by score
                 matching_lines.sort(key=lambda x: x["score"], reverse=True)
 
-                results.append({
-                    "path": str(file_path.relative_to(dir_path)),
-                    "score": score,
-                    "matches": matching_lines[:5],  # Top 5 matches
-                    "total_matches": len(matching_lines)
-                })
+                results.append(
+                    {
+                        "path": str(file_path.relative_to(dir_path)),
+                        "score": score,
+                        "matches": matching_lines[:5],  # Top 5 matches
+                        "total_matches": len(matching_lines),
+                    }
+                )
 
     # Sort by score
     results.sort(key=lambda x: x["score"], reverse=True)
@@ -592,27 +596,24 @@ async def search_code_semantic(
         "keywords": list(keywords),
         "results": results,
         "total_matches": len(results),
-        "_format": "json"
+        "_format": "json",
     }
 
 
 async def get_file_structure(
-    path: str,
-    depth: int = 2,
-    include_signatures: bool = True,
-    ctx: Context | None = None
+    path: str, depth: int = 2, include_signatures: bool = True, ctx: Context | None = None
 ) -> dict[str, Any]:
     """
     Get AST structure of a file.
-    
+
     99% token savings for understanding file organization.
-    
+
     Args:
         path: Path to file
         depth: Nesting depth to show (1-5)
         include_signatures: Include function signatures
         ctx: MCP context
-        
+
     Returns:
         File structure in TOON format
     """
@@ -633,9 +634,9 @@ async def get_file_structure(
         "summary": {
             "imports": len(structure.imports),
             "classes": len(structure.classes),
-            "functions": len(structure.functions)
+            "functions": len(structure.functions),
         },
-        "_format": "toon"
+        "_format": "toon",
     }
 
 
@@ -643,20 +644,20 @@ async def batch_read_files(
     paths: list[str],
     deduplicate: bool = True,
     strategy: Literal["auto", "full", "summary"] = "auto",
-    ctx: Context | None = None
+    ctx: Context | None = None,
 ) -> dict[str, Any]:
     """
     Read multiple files with cross-file deduplication.
-    
+
     60-80% savings on multi-file operations by extracting
     shared imports, patterns, and code segments.
-    
+
     Args:
         paths: List of file paths
         deduplicate: Enable cross-file deduplication
         strategy: Reading strategy
         ctx: MCP context
-        
+
     Returns:
         Batch result with deduplicated content
     """
@@ -674,14 +675,13 @@ async def batch_read_files(
             if isinstance(r.get("content"), str):
                 # Extract imports
                 imports = re.findall(
-                    r"^(?:from\s+[\w.]+\s+)?import\s+.+$|^import\s+.+$",
-                    r["content"],
-                    re.MULTILINE
+                    r"^(?:from\s+[\w.]+\s+)?import\s+.+$|^import\s+.+$", r["content"], re.MULTILINE
                 )
                 all_imports.extend(imports)
 
         # Find repeated imports
         from collections import Counter
+
         import_counts = Counter(all_imports)
         shared = [imp for imp, count in import_counts.items() if count > 1]
 
@@ -705,5 +705,7 @@ async def batch_read_files(
         "original_total_size": original_total,
         "result_total_size": result_total,
         "total_tokens_saved": (original_total - result_total) // 4,
-        "savings_pct": round((1 - result_total / original_total) * 100, 1) if original_total > 0 else 0
+        "savings_pct": round((1 - result_total / original_total) * 100, 1)
+        if original_total > 0
+        else 0,
     }

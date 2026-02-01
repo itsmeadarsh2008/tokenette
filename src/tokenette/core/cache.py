@@ -3,7 +3,7 @@ Multi-Layer Cache System
 
 Implements a 4-layer caching architecture for maximum token savings:
 - L1: Hot cache (in-memory LRU) - <5ms latency, 30min TTL
-- L2: Warm cache (disk-based) - <20ms latency, 4hr TTL  
+- L2: Warm cache (disk-based) - <20ms latency, 4hr TTL
 - L3: Cold storage (disk FIFO) - <100ms latency, 7d TTL
 - L4: Semantic index (vector) - <50ms latency, 30d TTL
 
@@ -68,13 +68,13 @@ class CacheResult:
 class MultiLayerCache:
     """
     Multi-layer caching system for maximum token optimization.
-    
+
     Architecture:
         L1 (Hot):     In-memory LRU, 100MB, 30min TTL, <5ms
-        L2 (Warm):    Disk LRU, 2GB, 4hr TTL, <20ms  
+        L2 (Warm):    Disk LRU, 2GB, 4hr TTL, <20ms
         L3 (Cold):    Disk FIFO, 50GB, 7d TTL, <100ms
         L4 (Semantic): Vector index, ∞, 30d TTL, <50ms
-    
+
     Example:
         >>> cache = MultiLayerCache()
         >>> await cache.set("key", {"data": "value"})
@@ -95,8 +95,7 @@ class MultiLayerCache:
         if self.config.l2_enabled:
             self.config.l2_directory.mkdir(parents=True, exist_ok=True)
             self._l2 = DiskCache(
-                str(self.config.l2_directory),
-                size_limit=self.config.l2_max_size_mb * 1024 * 1024
+                str(self.config.l2_directory), size_limit=self.config.l2_max_size_mb * 1024 * 1024
             )
 
         # L3: Cold disk cache
@@ -104,8 +103,7 @@ class MultiLayerCache:
         if self.config.l3_enabled:
             self.config.l3_directory.mkdir(parents=True, exist_ok=True)
             self._l3 = DiskCache(
-                str(self.config.l3_directory),
-                size_limit=self.config.l3_max_size_mb * 1024 * 1024
+                str(self.config.l3_directory), size_limit=self.config.l3_max_size_mb * 1024 * 1024
             )
 
         # L4: Semantic cache (optional, requires vector dependencies)
@@ -136,13 +134,14 @@ class MultiLayerCache:
     def content_hash(data: Any) -> str:
         """Generate content-addressable hash for data."""
         import json
+
         serialized = json.dumps(data, sort_keys=True, default=str)
         return xxhash.xxh128(serialized.encode()).hexdigest()[:16]
 
     async def get(self, key: str) -> CacheResult:
         """
         Look up a key across all cache layers.
-        
+
         Checks layers in order (L1 → L2 → L3 → L4) and promotes
         hits to higher layers for faster future access.
         """
@@ -163,7 +162,7 @@ class MultiLayerCache:
                     hit=True,
                     layer="L1",
                     latency_ms=latency,
-                    tokens_saved=tokens_saved
+                    tokens_saved=tokens_saved,
                 )
             else:
                 # Expired - remove from L1
@@ -187,7 +186,7 @@ class MultiLayerCache:
                         hit=True,
                         layer="L2",
                         latency_ms=latency,
-                        tokens_saved=tokens_saved
+                        tokens_saved=tokens_saved,
                     )
 
         # L3: Check cold storage
@@ -210,7 +209,7 @@ class MultiLayerCache:
                         hit=True,
                         layer="L3",
                         latency_ms=latency,
-                        tokens_saved=tokens_saved
+                        tokens_saved=tokens_saved,
                     )
 
         # L4: Semantic similarity search (if enabled)
@@ -226,30 +225,24 @@ class MultiLayerCache:
                     hit=True,
                     layer="L4",
                     latency_ms=latency,
-                    tokens_saved=tokens_saved
+                    tokens_saved=tokens_saved,
                 )
 
         # Cache miss
         self._stats["misses"] += 1
         latency = (time.perf_counter() - start_time) * 1000
-        return CacheResult(
-            data=None,
-            hit=False,
-            layer="MISS",
-            latency_ms=latency,
-            tokens_saved=0
-        )
+        return CacheResult(data=None, hit=False, layer="MISS", latency_ms=latency, tokens_saved=0)
 
     async def set(
         self,
         key: str,
         data: Any,
         ttl_seconds: int | None = None,
-        metadata: dict[str, Any] | None = None
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """
         Store data in the appropriate cache layer based on size and access patterns.
-        
+
         Small, frequently accessed items go to L1.
         Larger items start in L2/L3.
         Everything is indexed semantically in L4 if enabled.
@@ -264,11 +257,7 @@ class MultiLayerCache:
         if ttl_seconds is None:
             ttl_seconds = self.config.l1_ttl_seconds
 
-        entry = CacheEntry(
-            data=data,
-            size_bytes=size_bytes,
-            ttl_seconds=ttl_seconds
-        )
+        entry = CacheEntry(data=data, size_bytes=size_bytes, ttl_seconds=ttl_seconds)
 
         # Tier based on size
         if size_bytes < 10_000:  # < 10KB → L1
@@ -298,7 +287,7 @@ class MultiLayerCache:
                 "accessed_at": entry.accessed_at,
                 "hit_count": entry.hit_count,
                 "size_bytes": entry.size_bytes,
-                "ttl_seconds": self.config.l2_ttl_seconds
+                "ttl_seconds": self.config.l2_ttl_seconds,
             }
             self._l2.set(key, entry_dict, expire=self.config.l2_ttl_seconds)
 
@@ -311,7 +300,7 @@ class MultiLayerCache:
                 "accessed_at": entry.accessed_at,
                 "hit_count": entry.hit_count,
                 "size_bytes": entry.size_bytes,
-                "ttl_seconds": self.config.l3_ttl_seconds
+                "ttl_seconds": self.config.l3_ttl_seconds,
             }
             self._l3.set(key, entry_dict, expire=self.config.l3_ttl_seconds)
 
@@ -346,22 +335,16 @@ class MultiLayerCache:
 
     async def _index_semantic(self, key: str, data: Any) -> None:
         """Add entry to semantic index."""
-        self._l4_index.append({
-            "key": key,
-            "data": data,
-            "indexed_at": time.time()
-        })
+        self._l4_index.append({"key": key, "data": data, "indexed_at": time.time()})
 
         # Cleanup old entries
         cutoff = time.time() - self.config.l4_ttl_seconds
-        self._l4_index = [
-            e for e in self._l4_index
-            if e.get("indexed_at", 0) > cutoff
-        ]
+        self._l4_index = [e for e in self._l4_index if e.get("indexed_at", 0) > cutoff]
 
     def _estimate_tokens_saved(self, data: Any) -> int:
         """Estimate tokens saved by cache hit (~4 chars per token)."""
         import json
+
         if data is None:
             return 0
         serialized = json.dumps(data, default=str) if not isinstance(data, str) else data
@@ -370,7 +353,7 @@ class MultiLayerCache:
     def invalidate(self, pattern: str) -> int:
         """
         Invalidate cache entries matching a pattern.
-        
+
         Pattern can use '*' as wildcard.
         Returns number of entries invalidated.
         """
@@ -380,7 +363,7 @@ class MultiLayerCache:
         prefix = pattern.replace("*", "")
 
         # L1
-        keys_to_remove = [k for k in self._l1.keys() if prefix in k]
+        keys_to_remove = [k for k in self._l1 if prefix in k]
         for k in keys_to_remove:
             del self._l1[k]
             count += 1
@@ -397,17 +380,19 @@ class MultiLayerCache:
         if self._l3 is not None:
             self._l3.clear()
         self._l4_index.clear()
-        self._stats = {k: 0 for k in self._stats}
+        self._stats = dict.fromkeys(self._stats, 0)
 
     @property
     def stats(self) -> dict[str, Any]:
         """Get cache statistics."""
-        total_hits = sum([
-            self._stats["l1_hits"],
-            self._stats["l2_hits"],
-            self._stats["l3_hits"],
-            self._stats["l4_hits"]
-        ])
+        total_hits = sum(
+            [
+                self._stats["l1_hits"],
+                self._stats["l2_hits"],
+                self._stats["l3_hits"],
+                self._stats["l4_hits"],
+            ]
+        )
         total_requests = total_hits + self._stats["misses"]
 
         return {

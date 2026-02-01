@@ -3,7 +3,7 @@ Minification Engine
 
 Provides intelligent minification for different content types:
 - JSON Minify: Remove whitespace → 20-40% savings
-- Code Minify: Remove comments/blanks → 30-50% savings  
+- Code Minify: Remove comments/blanks → 30-50% savings
 - TOON Format: Columnar structured data → 61% savings
 
 All minification is lossless and reversible client-side.
@@ -19,9 +19,11 @@ from tokenette.config import CompressionConfig
 
 try:
     import orjson
+
     HAS_ORJSON = True
 except ImportError:
     import json as stdlib_json
+
     HAS_ORJSON = False
 
 
@@ -45,12 +47,12 @@ class MinificationResult:
 class MinificationEngine:
     """
     Intelligent minification engine for maximum token savings.
-    
+
     Three formats, auto-selected based on content type:
     - JSON Minify:  Remove whitespace        → 20-40% savings
     - Code Minify:  Remove comments/blanks   → 30-50% savings
     - TOON Format:  Columnar structured data → 61% savings
-    
+
     Example:
         >>> engine = MinificationEngine()
         >>> result = engine.minify({"key": "value", "list": [1, 2, 3]})
@@ -59,16 +61,16 @@ class MinificationEngine:
 
     # Code detection patterns
     CODE_PATTERNS = [
-        r'\bdef\s+\w+\s*\(',       # Python function
-        r'\bclass\s+\w+',           # Python/JS class
-        r'\bfunction\s+\w+\s*\(',   # JS function
-        r'\bimport\s+[\w{},\s]+',   # Import statements
-        r'\bexport\s+',             # JS export
-        r'\bconst\s+\w+\s*=',       # JS const
-        r'\blet\s+\w+\s*=',         # JS let
-        r'\bvar\s+\w+\s*=',         # JS var
-        r'^\s*#.*$',                # Python comments
-        r'//.*$',                   # JS/C++ comments
+        r"\bdef\s+\w+\s*\(",  # Python function
+        r"\bclass\s+\w+",  # Python/JS class
+        r"\bfunction\s+\w+\s*\(",  # JS function
+        r"\bimport\s+[\w{},\s]+",  # Import statements
+        r"\bexport\s+",  # JS export
+        r"\bconst\s+\w+\s*=",  # JS const
+        r"\blet\s+\w+\s*=",  # JS let
+        r"\bvar\s+\w+\s*=",  # JS var
+        r"^\s*#.*$",  # Python comments
+        r"//.*$",  # JS/C++ comments
     ]
 
     def __init__(self, config: CompressionConfig | None = None):
@@ -76,17 +78,15 @@ class MinificationEngine:
         self._code_regex = [re.compile(p, re.MULTILINE) for p in self.CODE_PATTERNS]
 
     def minify(
-        self,
-        data: Any,
-        content_type: Literal["auto", "json", "code", "toon", "text"] = "auto"
+        self, data: Any, content_type: Literal["auto", "json", "code", "toon", "text"] = "auto"
     ) -> MinificationResult:
         """
         Minify data using the optimal format.
-        
+
         Args:
             data: Data to minify (dict, list, str, etc.)
             content_type: Force specific format or "auto" to detect
-            
+
         Returns:
             MinificationResult with minified data and metrics
         """
@@ -109,7 +109,9 @@ class MinificationEngine:
             result = self._minify_text(data if isinstance(data, str) else str(data))
 
         result_tokens = self._estimate_tokens(result)
-        savings_pct = round((1 - result_tokens / original_tokens) * 100, 1) if original_tokens > 0 else 0.0
+        savings_pct = (
+            round((1 - result_tokens / original_tokens) * 100, 1) if original_tokens > 0 else 0.0
+        )
 
         return MinificationResult(
             data=result,
@@ -117,7 +119,7 @@ class MinificationEngine:
             original_tokens=original_tokens,
             result_tokens=result_tokens,
             savings_pct=savings_pct,
-            client_instruction="format_on_display"
+            client_instruction="format_on_display",
         )
 
     def _detect_type(self, data: Any) -> Literal["json", "code", "toon", "text"]:
@@ -139,7 +141,7 @@ class MinificationEngine:
     def _is_toon_compatible(self, data: Any) -> bool:
         """
         Check if data is compatible with TOON format.
-        
+
         TOON works best with homogeneous arrays of dicts
         where all items have the same keys.
         """
@@ -176,10 +178,10 @@ class MinificationEngine:
     def _minify_json(self, data: Any) -> str:
         """
         Minify JSON by removing all unnecessary whitespace.
-        
+
         Before: {"key": "value", "list": [1, 2, 3]}  (pretty)
         After:  {"key":"value","list":[1,2,3]}       (minified)
-        
+
         Savings: 20-40%
         """
         if HAS_ORJSON:
@@ -190,7 +192,7 @@ class MinificationEngine:
         """
         Minify source code by removing comments and blank lines.
         Preserves Python indentation for correctness.
-        
+
         Savings: 30-50%
         """
         lines = code.split("\n")
@@ -233,7 +235,7 @@ class MinificationEngine:
             char = line[i]
 
             # Track string state
-            if char in ('"', "'") and (i == 0 or line[i-1] != "\\"):
+            if char in ('"', "'") and (i == 0 or line[i - 1] != "\\"):
                 if not in_string:
                     in_string = True
                     string_char = char
@@ -247,7 +249,7 @@ class MinificationEngine:
                 if char == "#":
                     return line[:i].rstrip()
                 # C++/JS comment
-                if char == "/" and i + 1 < len(line) and line[i+1] == "/":
+                if char == "/" and i + 1 < len(line) and line[i + 1] == "/":
                     return line[:i].rstrip()
 
             i += 1
@@ -257,19 +259,19 @@ class MinificationEngine:
     def _to_toon(self, data: list[dict[str, Any]]) -> str:
         """
         Convert homogeneous array to TOON format.
-        
+
         TOON (Token-Optimized Object Notation) is a columnar format
         that achieves 61% token reduction on structured data.
-        
+
         Before (JSON):
         [{"file":"auth.js","func":"validate","line":45},
          {"file":"auth.js","func":"refresh","line":67}]
-        
+
         After (TOON):
         items[2]{file,func,line}:
         auth.js,validate,45
         auth.js,refresh,67
-        
+
         Savings: ~61%
         """
         if not data:
@@ -293,42 +295,42 @@ class MinificationEngine:
     def _minify_text(self, text: str) -> str:
         """
         Minify plain text by collapsing whitespace.
-        
+
         - Multiple spaces → single space
         - Multiple newlines → single newline
         - Strip trailing whitespace
         """
         # Collapse multiple spaces
-        result = re.sub(r' +', ' ', text)
+        result = re.sub(r" +", " ", text)
         # Collapse multiple newlines
-        result = re.sub(r'\n\s*\n', '\n', result)
+        result = re.sub(r"\n\s*\n", "\n", result)
         # Strip lines
-        lines = [line.strip() for line in result.split('\n')]
-        return '\n'.join(lines)
+        lines = [line.strip() for line in result.split("\n")]
+        return "\n".join(lines)
 
     @staticmethod
     def parse_toon(toon_data: str) -> list[dict[str, Any]]:
         """
         Parse TOON format back to list of dicts.
-        
+
         This is used client-side to restore the original structure.
         """
-        lines = toon_data.strip().split('\n')
+        lines = toon_data.strip().split("\n")
         if not lines or lines[0] == "[]":
             return []
 
         # Parse header: items[N]{key1,key2,key3}:
         header = lines[0]
-        header_match = re.match(r'items\[(\d+)\]\{([^}]+)\}:', header)
+        header_match = re.match(r"items\[(\d+)\]\{([^}]+)\}:", header)
         if not header_match:
             raise ValueError(f"Invalid TOON header: {header}")
 
         count = int(header_match.group(1))
-        keys = header_match.group(2).split(',')
+        keys = header_match.group(2).split(",")
 
         # Parse rows
         result = []
-        for row in lines[1:count+1]:
+        for row in lines[1 : count + 1]:
             if not row.strip():
                 continue
 
@@ -340,14 +342,14 @@ class MinificationEngine:
                 if escaped:
                     current.append(char)
                     escaped = False
-                elif char == '\\':
+                elif char == "\\":
                     escaped = True
-                elif char == ',':
-                    values.append(''.join(current))
+                elif char == ",":
+                    values.append("".join(current))
                     current = []
                 else:
                     current.append(char)
-            values.append(''.join(current))
+            values.append("".join(current))
 
             # Build dict
             item = {}
@@ -357,7 +359,7 @@ class MinificationEngine:
                     value = values[i]
                     if value.isdigit():
                         item[key] = int(value)
-                    elif value.replace('.', '').replace('-', '').isdigit():
+                    elif value.replace(".", "").replace("-", "").isdigit():
                         try:
                             item[key] = float(value)
                         except ValueError:

@@ -31,12 +31,13 @@ app = typer.Typer(
     name="tokenette",
     help="🪙 Tokenette: The Ultimate AI Coding Enhancement MCP",
     no_args_is_help=True,
-    rich_markup_mode="rich"
+    rich_markup_mode="rich",
 )
 console = Console()
 
 
 # ─── RUN COMMAND ─────────────────────────────────────────────────
+
 
 @app.command()
 def run(
@@ -44,11 +45,11 @@ def run(
     port: Annotated[int, typer.Option(help="Port to bind to")] = 8000,
     transport: Annotated[str, typer.Option(help="Transport type: stdio, sse, http")] = "stdio",
     reload: Annotated[bool, typer.Option(help="Enable auto-reload")] = False,
-    debug: Annotated[bool, typer.Option(help="Enable debug mode")] = False
+    debug: Annotated[bool, typer.Option(help="Enable debug mode")] = False,
 ):
     """
     🚀 Start the Tokenette MCP server.
-    
+
     Examples:
         tokenette run                    # stdio transport (default)
         tokenette run --transport sse    # SSE transport
@@ -56,11 +57,13 @@ def run(
     """
     from .server import mcp
 
-    console.print(Panel.fit(
-        "[bold green]🪙 Tokenette MCP Server[/bold green]\n"
-        f"Transport: {transport} | Host: {host}:{port}",
-        border_style="green"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold green]🪙 Tokenette MCP Server[/bold green]\n"
+            f"Transport: {transport} | Host: {host}:{port}",
+            border_style="green",
+        )
+    )
 
     if transport == "stdio":
         # Run with stdio transport (default for MCP)
@@ -71,12 +74,13 @@ def run(
     elif transport == "http":
         # Run with HTTP/streamable transport
         import uvicorn
+
         uvicorn.run(
             "tokenette.server:app",
             host=host,
             port=port,
             reload=reload,
-            log_level="debug" if debug else "info"
+            log_level="debug" if debug else "info",
         )
     else:
         console.print(f"[red]Unknown transport: {transport}[/red]")
@@ -85,13 +89,12 @@ def run(
 
 # ─── METRICS COMMAND ─────────────────────────────────────────────
 
+
 @app.command()
-def metrics(
-    format: Annotated[str, typer.Option(help="Output format: table, json")] = "table"
-):
+def metrics(format: Annotated[str, typer.Option(help="Output format: table, json")] = "table"):
     """
     📊 View current metrics and statistics.
-    
+
     Shows token savings, cache performance, and budget usage.
     """
     config = get_config()
@@ -106,13 +109,13 @@ def metrics(
             "budget": {
                 "limit": router.budget_tracker.monthly_limit,
                 "used": router.budget_tracker.used,
-                "remaining": router.budget_tracker.remaining
+                "remaining": router.budget_tracker.remaining,
             },
             "config": {
                 "cache_l1_size": config.cache.l1_max_size,
                 "cache_l2_size": config.cache.l2_max_size,
-                "compression_min_size": config.compression.min_size
-            }
+                "compression_min_size": config.compression.min_size,
+            },
         }
         console.print_json(json.dumps(data))
         return
@@ -132,7 +135,9 @@ def metrics(
     # Budget stats
     table.add_row("", "", "")  # Separator
     table.add_row("Budget Used", f"{router.budget_tracker.used:.1f}", "Premium requests used")
-    table.add_row("Budget Remaining", f"{router.budget_tracker.remaining:.1f}", "Premium requests left")
+    table.add_row(
+        "Budget Remaining", f"{router.budget_tracker.remaining:.1f}", "Premium requests left"
+    )
     table.add_row("Budget %", f"{router.budget_tracker.usage_pct:.1f}%", "Monthly usage")
 
     console.print(table)
@@ -145,15 +150,16 @@ async def _get_cache_stats(cache: MultiLayerCache) -> dict:
 
 # ─── CONFIG COMMAND ──────────────────────────────────────────────
 
+
 @app.command()
 def config(
     show: Annotated[bool, typer.Option(help="Show current configuration")] = False,
     init: Annotated[bool, typer.Option(help="Initialize config file")] = False,
-    path: Annotated[Path | None, typer.Option(help="Config file path")] = None
+    path: Annotated[Path | None, typer.Option(help="Config file path")] = None,
 ):
     """
     ⚙️ Manage Tokenette configuration.
-    
+
     Examples:
         tokenette config --show          # Show current config
         tokenette config --init          # Create .tokenette.json
@@ -173,26 +179,22 @@ def config(
 
     if show or not any([init]):
         cfg = get_config()
-        syntax = Syntax(
-            cfg.model_dump_json(indent=2),
-            "json",
-            theme="monokai",
-            line_numbers=True
-        )
+        syntax = Syntax(cfg.model_dump_json(indent=2), "json", theme="monokai", line_numbers=True)
         console.print(Panel(syntax, title="Current Configuration", border_style="blue"))
 
 
 # ─── CACHE COMMAND ───────────────────────────────────────────────
 
+
 @app.command()
 def cache(
     clear: Annotated[bool, typer.Option(help="Clear all caches")] = False,
     clear_l1: Annotated[bool, typer.Option(help="Clear L1 cache only")] = False,
-    stats: Annotated[bool, typer.Option(help="Show cache statistics")] = False
+    stats: Annotated[bool, typer.Option(help="Show cache statistics")] = False,
 ):
     """
     🗄️ Cache management commands.
-    
+
     Examples:
         tokenette cache --stats         # Show cache stats
         tokenette cache --clear         # Clear all caches
@@ -224,25 +226,25 @@ def cache(
             "L1 (Memory)",
             str(cache_stats.get("l1_entries", 0)),
             f"{cache_stats.get('l1_size_mb', 0):.1f} MB",
-            f"{cache_stats.get('l1_hit_rate', 0):.1%}"
+            f"{cache_stats.get('l1_hit_rate', 0):.1%}",
         )
         table.add_row(
             "L2 (Disk Warm)",
             str(cache_stats.get("l2_entries", 0)),
             f"{cache_stats.get('l2_size_mb', 0):.1f} MB",
-            f"{cache_stats.get('l2_hit_rate', 0):.1%}"
+            f"{cache_stats.get('l2_hit_rate', 0):.1%}",
         )
         table.add_row(
             "L3 (Disk Cold)",
             str(cache_stats.get("l3_entries", 0)),
             f"{cache_stats.get('l3_size_mb', 0):.1f} MB",
-            "-"
+            "-",
         )
         table.add_row(
             "L4 (Semantic)",
             str(cache_stats.get("l4_entries", 0)),
             "-",
-            f"{cache_stats.get('l4_hit_rate', 0):.1%}"
+            f"{cache_stats.get('l4_hit_rate', 0):.1%}",
         )
 
         console.print(table)
@@ -250,17 +252,18 @@ def cache(
 
 # ─── ANALYZE COMMAND ─────────────────────────────────────────────
 
+
 @app.command()
 def analyze(
     path: Annotated[Path, typer.Argument(help="File or directory to analyze")],
     complexity: Annotated[bool, typer.Option(help="Check complexity")] = True,
     security: Annotated[bool, typer.Option(help="Check security issues")] = True,
     style: Annotated[bool, typer.Option(help="Check style issues")] = False,
-    format: Annotated[str, typer.Option(help="Output format: table, json")] = "table"
+    format: Annotated[str, typer.Option(help="Output format: table, json")] = "table",
 ):
     """
     🔍 Analyze code for issues and complexity.
-    
+
     Examples:
         tokenette analyze src/              # Analyze directory
         tokenette analyze main.py           # Analyze file
@@ -284,15 +287,17 @@ def analyze(
 
     # Summary panel
     summary = result.get("summary", {})
-    console.print(Panel(
-        f"[bold]Files analyzed:[/bold] {summary.get('files_analyzed', 0)}\n"
-        f"[bold]Total issues:[/bold] {summary.get('total_issues', 0)}\n"
-        f"[red]High:[/red] {summary.get('high_severity', 0)} | "
-        f"[yellow]Medium:[/yellow] {summary.get('medium_severity', 0)} | "
-        f"[dim]Low:[/dim] {summary.get('low_severity', 0)}",
-        title="🔍 Analysis Summary",
-        border_style="blue"
-    ))
+    console.print(
+        Panel(
+            f"[bold]Files analyzed:[/bold] {summary.get('files_analyzed', 0)}\n"
+            f"[bold]Total issues:[/bold] {summary.get('total_issues', 0)}\n"
+            f"[red]High:[/red] {summary.get('high_severity', 0)} | "
+            f"[yellow]Medium:[/yellow] {summary.get('medium_severity', 0)} | "
+            f"[dim]Low:[/dim] {summary.get('low_severity', 0)}",
+            title="🔍 Analysis Summary",
+            border_style="blue",
+        )
+    )
 
     # Issues table
     issues = result.get("issues", [])
@@ -304,17 +309,15 @@ def analyze(
         table.add_column("Message")
 
         for issue in issues[:20]:  # Limit display
-            severity_color = {
-                "high": "red",
-                "medium": "yellow",
-                "low": "dim"
-            }.get(issue.get("severity", "low"), "dim")
+            severity_color = {"high": "red", "medium": "yellow", "low": "dim"}.get(
+                issue.get("severity", "low"), "dim"
+            )
 
             table.add_row(
                 f"[{severity_color}]{issue.get('severity', 'low').upper()}[/{severity_color}]",
                 issue.get("type", "unknown"),
                 f"{Path(issue.get('file', '')).name}:{issue.get('line', 0)}",
-                issue.get("message", "")[:60]
+                issue.get("message", "")[:60],
             )
 
         console.print(table)
@@ -325,14 +328,15 @@ def analyze(
 
 # ─── ROUTE COMMAND ───────────────────────────────────────────────
 
+
 @app.command()
 def route(
     task: Annotated[str, typer.Argument(help="Task description")],
-    files: Annotated[int, typer.Option(help="Number of affected files")] = 1
+    files: Annotated[int, typer.Option(help="Number of affected files")] = 1,
 ):
     """
     🧭 Get model routing recommendation for a task.
-    
+
     Examples:
         tokenette route "fix auth bug"
         tokenette route "refactor entire codebase" --files 50
@@ -343,30 +347,35 @@ def route(
     decision = router.route(task, {"affected_files": files})
 
     # Display recommendation
-    console.print(Panel(
-        f"[bold cyan]Recommended Model:[/bold cyan] {decision.model}\n"
-        f"[bold]Complexity:[/bold] {decision.complexity.name}\n"
-        f"[bold]Category:[/bold] {decision.category.value}\n"
-        f"[bold]Multiplier:[/bold] {decision.multiplier}× → {decision.effective_multiplier}× (with auto)\n"
-        f"[bold]Quality Boosters:[/bold] {', '.join(decision.quality_boosters[:3])}\n"
-        f"[bold]Fallbacks:[/bold] {' → '.join(decision.fallback_chain[:3])}",
-        title="🧭 Task Routing",
-        border_style="green"
-    ))
+    console.print(
+        Panel(
+            f"[bold cyan]Recommended Model:[/bold cyan] {decision.model}\n"
+            f"[bold]Complexity:[/bold] {decision.complexity.name}\n"
+            f"[bold]Category:[/bold] {decision.category.value}\n"
+            f"[bold]Multiplier:[/bold] {decision.multiplier}× → {decision.effective_multiplier}× (with auto)\n"
+            f"[bold]Quality Boosters:[/bold] {', '.join(decision.quality_boosters[:3])}\n"
+            f"[bold]Fallbacks:[/bold] {' → '.join(decision.fallback_chain[:3])}",
+            title="🧭 Task Routing",
+            border_style="green",
+        )
+    )
 
     console.print(f"\n[dim]{decision.reasoning}[/dim]")
 
 
 # ─── VERSION COMMAND ─────────────────────────────────────────────
 
+
 @app.command()
 def version():
     """📦 Show Tokenette version."""
     from . import __version__
+
     console.print(f"[bold green]Tokenette[/bold green] v{__version__}")
 
 
 # ─── MAIN ENTRY POINT ────────────────────────────────────────────
+
 
 def main():
     """Main CLI entry point."""

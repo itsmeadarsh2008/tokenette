@@ -15,6 +15,7 @@ from typing import Any
 @dataclass
 class TokenCount:
     """Result of token counting."""
+
     text_length: int
     estimated_tokens: int
     breakdown: dict[str, int] = field(default_factory=dict)
@@ -23,6 +24,7 @@ class TokenCount:
 @dataclass
 class CostEstimate:
     """Cost estimate for a model interaction."""
+
     model: str
     input_tokens: int
     output_tokens_estimate: int
@@ -35,6 +37,7 @@ class CostEstimate:
 @dataclass
 class BudgetStatus:
     """Current budget status."""
+
     monthly_limit: int
     used: float
     remaining: float
@@ -62,7 +65,7 @@ CODE_PATTERNS = {
     "default": {
         "avg_tokens_per_char": 0.25,  # ~4 chars per token
         "keyword_weight": 1.0,
-    }
+    },
 }
 
 # Model pricing (tokens-based for some, multiplier for GitHub Copilot)
@@ -79,37 +82,24 @@ MODEL_COSTS = {
     "claude-opus-4.5": {"multiplier": 3.0, "tier": "expensive"},
     "claude-opus-4": {"multiplier": 10.0, "tier": "expensive"},
     "gpt-4.5": {"multiplier": 50.0, "tier": "avoid"},
-
     # Claude Code (token-based, per 1M tokens)
-    "claude-sonnet-4.5-api": {
-        "input_per_1m": 3.00,
-        "output_per_1m": 15.00,
-        "tier": "api"
-    },
-    "claude-opus-4.5-api": {
-        "input_per_1m": 15.00,
-        "output_per_1m": 75.00,
-        "tier": "api"
-    }
+    "claude-sonnet-4.5-api": {"input_per_1m": 3.00, "output_per_1m": 15.00, "tier": "api"},
+    "claude-opus-4.5-api": {"input_per_1m": 15.00, "output_per_1m": 75.00, "tier": "api"},
 }
 
 
-def count_tokens(
-    text: str,
-    language: str | None = None,
-    detailed: bool = False
-) -> TokenCount:
+def count_tokens(text: str, language: str | None = None, detailed: bool = False) -> TokenCount:
     """
     Estimate token count for text/code.
-    
+
     Uses language-aware heuristics for better accuracy.
     For exact counts, would need a real tokenizer.
-    
+
     Args:
         text: Text or code to count
         language: Programming language for better estimation
         detailed: Include detailed breakdown
-    
+
     Returns:
         TokenCount with estimates
     """
@@ -132,14 +122,14 @@ def count_tokens(
         # Code-specific counts
         if language:
             breakdown["strings"] = len(re.findall(r'["\'].*?["\']', text))
-            breakdown["comments"] = len(re.findall(r'#.*|//.*|/\*.*?\*/', text, re.DOTALL))
-            breakdown["numbers"] = len(re.findall(r'\b\d+\.?\d*\b', text))
+            breakdown["comments"] = len(re.findall(r"#.*|//.*|/\*.*?\*/", text, re.DOTALL))
+            breakdown["numbers"] = len(re.findall(r"\b\d+\.?\d*\b", text))
 
     # Adjust for special content
     adjustments = 0
 
     # Whitespace is efficient (multiple spaces = 1 token usually)
-    whitespace_ratio = len(re.findall(r'\s+', text)) / max(text_length, 1)
+    whitespace_ratio = len(re.findall(r"\s+", text)) / max(text_length, 1)
     if whitespace_ratio > 0.2:
         adjustments -= int(base_tokens * 0.1)
 
@@ -149,7 +139,7 @@ def count_tokens(
         adjustments += len(long_strings) * 10
 
     # URLs and paths are expensive
-    urls = re.findall(r'https?://\S+', text)
+    urls = re.findall(r"https?://\S+", text)
     adjustments += len(urls) * 5
 
     final_tokens = max(1, base_tokens + adjustments)
@@ -158,11 +148,7 @@ def count_tokens(
         breakdown["base_estimate"] = base_tokens
         breakdown["adjustments"] = adjustments
 
-    return TokenCount(
-        text_length=text_length,
-        estimated_tokens=final_tokens,
-        breakdown=breakdown
-    )
+    return TokenCount(text_length=text_length, estimated_tokens=final_tokens, breakdown=breakdown)
 
 
 def count_tokens_in_file(file_path: str, detailed: bool = False) -> TokenCount:
@@ -200,17 +186,17 @@ def estimate_cost(
     model: str,
     input_text: str | int,
     output_estimate: int = 500,
-    context: str = "copilot"  # "copilot" or "api"
+    context: str = "copilot",  # "copilot" or "api"
 ) -> CostEstimate:
     """
     Estimate the cost of a model interaction.
-    
+
     Args:
         model: Model name
         input_text: Input text or token count
         output_estimate: Estimated output tokens
         context: "copilot" for GitHub Copilot, "api" for direct API
-    
+
     Returns:
         CostEstimate with breakdown
     """
@@ -234,8 +220,10 @@ def estimate_cost(
             dollar_cost=None,  # Copilot is subscription
             breakdown={
                 "tier": model_info.get("tier", "unknown"),
-                "uses_per_month_at_this_rate": int(300 / max(multiplier, 0.01)) if multiplier > 0 else "unlimited"
-            }
+                "uses_per_month_at_this_rate": int(300 / max(multiplier, 0.01))
+                if multiplier > 0
+                else "unlimited",
+            },
         )
     else:
         # API pricing
@@ -253,19 +241,15 @@ def estimate_cost(
             breakdown={
                 "input_cost": round(input_cost, 6),
                 "output_cost": round(output_cost, 6),
-                "total": round(total_cost, 6)
-            }
+                "total": round(total_cost, 6),
+            },
         )
 
 
 class BudgetTracker:
     """Track and manage token/request budgets."""
 
-    def __init__(
-        self,
-        monthly_limit: int = 300,
-        reset_day: int = 1
-    ):
+    def __init__(self, monthly_limit: int = 300, reset_day: int = 1):
         self.monthly_limit = monthly_limit
         self.reset_day = reset_day
         self.used: float = 0.0
@@ -273,22 +257,20 @@ class BudgetTracker:
         self.start_date = datetime.now().replace(day=reset_day)
 
     def record_usage(
-        self,
-        model: str,
-        multiplier: float,
-        tokens_in: int = 0,
-        tokens_out: int = 0
+        self, model: str, multiplier: float, tokens_in: int = 0, tokens_out: int = 0
     ) -> None:
         """Record a usage event."""
         self.used += multiplier
-        self.history.append({
-            "timestamp": datetime.now().isoformat(),
-            "model": model,
-            "multiplier": multiplier,
-            "tokens_in": tokens_in,
-            "tokens_out": tokens_out,
-            "running_total": self.used
-        })
+        self.history.append(
+            {
+                "timestamp": datetime.now().isoformat(),
+                "model": model,
+                "multiplier": multiplier,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
+                "running_total": self.used,
+            }
+        )
 
     def get_status(self) -> BudgetStatus:
         """Get current budget status with recommendations."""
@@ -314,12 +296,16 @@ class BudgetTracker:
         recommendations = []
 
         if percentage > 80:
-            recommendations.append("⚠️ Budget critically low. Use free models (gpt-4.1) for remaining tasks.")
+            recommendations.append(
+                "⚠️ Budget critically low. Use free models (gpt-4.1) for remaining tasks."
+            )
         elif percentage > 60:
             recommendations.append("📊 Over 60% used. Consider cheaper models for simple tasks.")
 
         if daily_budget < 5:
-            recommendations.append(f"📅 Daily budget: {daily_budget:.1f} requests. Batch operations when possible.")
+            recommendations.append(
+                f"📅 Daily budget: {daily_budget:.1f} requests. Batch operations when possible."
+            )
 
         if not on_track:
             recommendations.append("📈 Usage ahead of schedule. Reduce expensive model usage.")
@@ -327,7 +313,9 @@ class BudgetTracker:
         # Model-specific recommendations
         expensive_count = sum(1 for h in self.history if h["multiplier"] >= 3)
         if expensive_count > 10:
-            recommendations.append("💡 High expensive model usage. Consider o4-mini (0.33×) for debugging.")
+            recommendations.append(
+                "💡 High expensive model usage. Consider o4-mini (0.33×) for debugging."
+            )
 
         return BudgetStatus(
             monthly_limit=self.monthly_limit,
@@ -337,7 +325,7 @@ class BudgetTracker:
             days_remaining=days_remaining,
             daily_budget=round(daily_budget, 2),
             on_track=on_track,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
     def reset(self) -> None:
@@ -380,16 +368,14 @@ def get_budget_tracker(monthly_limit: int = 300) -> BudgetTracker:
     return _budget_tracker
 
 
-def compare_model_costs(
-    input_text: str,
-    output_estimate: int = 500
-) -> list[dict]:
+def compare_model_costs(input_text: str, output_estimate: int = 500) -> list[dict]:
     """
     Compare costs across all available models.
-    
+
     Useful for choosing the right model for a task.
     """
-    input_tokens = count_tokens(input_text).estimated_tokens
+    _ = count_tokens(input_text).estimated_tokens  # For future cost calculation
+    _ = output_estimate  # Reserved for future use
 
     comparisons = []
 
@@ -398,15 +384,19 @@ def compare_model_costs(
             multiplier = info["multiplier"]
             uses_per_month = int(300 / max(multiplier, 0.01)) if multiplier > 0 else 999999
 
-            comparisons.append({
-                "model": model,
-                "tier": info.get("tier", "unknown"),
-                "multiplier": multiplier,
-                "uses_per_month": uses_per_month if uses_per_month < 999999 else "unlimited",
-                "cost_type": "premium_request"
-            })
+            comparisons.append(
+                {
+                    "model": model,
+                    "tier": info.get("tier", "unknown"),
+                    "multiplier": multiplier,
+                    "uses_per_month": uses_per_month if uses_per_month < 999999 else "unlimited",
+                    "cost_type": "premium_request",
+                }
+            )
 
     # Sort by multiplier (cheapest first)
-    comparisons.sort(key=lambda x: x["multiplier"] if isinstance(x["multiplier"], (int, float)) else 0)
+    comparisons.sort(
+        key=lambda x: x["multiplier"] if isinstance(x["multiplier"], (int, float)) else 0
+    )
 
     return comparisons

@@ -23,26 +23,26 @@ from tokenette.config import RouterConfig
 class Complexity(Enum):
     """Task complexity levels."""
 
-    TRIVIAL = 1     # 1-liner, rename, add comment
-    SIMPLE = 2      # Single function, basic CRUD
-    MODERATE = 3    # Multi-function, small refactor
-    COMPLEX = 4     # Multi-file, algorithms, architecture
-    EXPERT = 5      # Distributed systems, security-critical
+    TRIVIAL = 1  # 1-liner, rename, add comment
+    SIMPLE = 2  # Single function, basic CRUD
+    MODERATE = 3  # Multi-function, small refactor
+    COMPLEX = 4  # Multi-file, algorithms, architecture
+    EXPERT = 5  # Distributed systems, security-critical
 
 
 class TaskCategory(Enum):
     """Task categories for routing."""
 
-    COMPLETION = "completion"         # Inline code completion
-    GENERATION = "generation"         # Write new code
-    REFACTOR = "refactor"             # Restructure existing code
-    BUG_FIX = "bug_fix"              # Find and fix bugs
-    REVIEW = "review"                 # Code review
-    ARCHITECTURE = "architecture"     # System design
-    OPTIMIZATION = "optimization"     # Performance tuning
-    TESTING = "testing"               # Write tests
-    DOCS = "docs"                     # Documentation
-    DEBUGGING = "debugging"           # Deep debug sessions
+    COMPLETION = "completion"  # Inline code completion
+    GENERATION = "generation"  # Write new code
+    REFACTOR = "refactor"  # Restructure existing code
+    BUG_FIX = "bug_fix"  # Find and fix bugs
+    REVIEW = "review"  # Code review
+    ARCHITECTURE = "architecture"  # System design
+    OPTIMIZATION = "optimization"  # Performance tuning
+    TESTING = "testing"  # Write tests
+    DOCS = "docs"  # Documentation
+    DEBUGGING = "debugging"  # Deep debug sessions
 
 
 # Model profiles with verified benchmark data (Updated: Feb 2026)
@@ -62,13 +62,17 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "context_window": 1_047_576,  # ~1M tokens
         "strengths": [Complexity.TRIVIAL, Complexity.SIMPLE, Complexity.MODERATE],
         "categories": [
-            TaskCategory.COMPLETION, TaskCategory.GENERATION,
-            TaskCategory.TESTING, TaskCategory.DOCS, TaskCategory.REVIEW,
-            TaskCategory.REFACTOR, TaskCategory.BUG_FIX
+            TaskCategory.COMPLETION,
+            TaskCategory.GENERATION,
+            TaskCategory.TESTING,
+            TaskCategory.DOCS,
+            TaskCategory.REVIEW,
+            TaskCategory.REFACTOR,
+            TaskCategory.BUG_FIX,
         ],
         "benchmark_note": "Best free model. 97% on easy, 85% on medium. GitHub's default. Agentic coding champion.",
         "tier": "free",
-        "rank": 1
+        "rank": 1,
     },
     "gpt-4o": {
         "multiplier": 0,
@@ -77,12 +81,14 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "context_window": 128_000,
         "strengths": [Complexity.TRIVIAL, Complexity.SIMPLE, Complexity.MODERATE],
         "categories": [
-            TaskCategory.COMPLETION, TaskCategory.GENERATION,
-            TaskCategory.DOCS, TaskCategory.REVIEW
+            TaskCategory.COMPLETION,
+            TaskCategory.GENERATION,
+            TaskCategory.DOCS,
+            TaskCategory.REVIEW,
         ],
         "benchmark_note": "Full vision/multimodal. Use for image-related tasks. Good generalist.",
         "tier": "free",
-        "rank": 2
+        "rank": 2,
     },
     "gpt-4.1-mini": {
         "multiplier": 0,
@@ -93,9 +99,8 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "categories": [TaskCategory.COMPLETION, TaskCategory.DOCS, TaskCategory.GENERATION],
         "benchmark_note": "Fastest free model. Quick edits, prototyping, utility code.",
         "tier": "free",
-        "rank": 3
+        "rank": 3,
     },
-
     # ─── CHEAP TIER (High value) ───────────────────────────────────
     "gemini-2.0-flash": {
         "multiplier": 0.25,
@@ -106,7 +111,7 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "categories": [TaskCategory.COMPLETION, TaskCategory.GENERATION, TaskCategory.DOCS],
         "benchmark_note": "Cheapest premium (0.25×). 1M context. Speed-critical large file tasks.",
         "tier": "cheap",
-        "rank": 4
+        "rank": 4,
     },
     "o4-mini": {
         "multiplier": 0.33,
@@ -117,7 +122,7 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "categories": [TaskCategory.DEBUGGING, TaskCategory.OPTIMIZATION, TaskCategory.BUG_FIX],
         "benchmark_note": "Best value for reasoning. Step-by-step logic. Tricky bugs, algorithms.",
         "tier": "cheap",
-        "rank": 5
+        "rank": 5,
     },
     "o3-mini": {
         "multiplier": 0.33,
@@ -128,9 +133,8 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "categories": [TaskCategory.DEBUGGING, TaskCategory.BUG_FIX, TaskCategory.TESTING],
         "benchmark_note": "Cost-efficient reasoning. Good for test generation and bug analysis.",
         "tier": "cheap",
-        "rank": 6
+        "rank": 6,
     },
-
     # ─── MODERATE TIER (1× = 300/month) ────────────────────────────
     "claude-sonnet-4": {
         "multiplier": 1.0,
@@ -139,12 +143,15 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "context_window": 200_000,
         "strengths": [Complexity.MODERATE, Complexity.COMPLEX],
         "categories": [
-            TaskCategory.REFACTOR, TaskCategory.ARCHITECTURE,
-            TaskCategory.OPTIMIZATION, TaskCategory.REVIEW, TaskCategory.BUG_FIX
+            TaskCategory.REFACTOR,
+            TaskCategory.ARCHITECTURE,
+            TaskCategory.OPTIMIZATION,
+            TaskCategory.REVIEW,
+            TaskCategory.BUG_FIX,
         ],
         "benchmark_note": "Workhorse for complex tasks. Multi-file refactoring. Strong code review.",
         "tier": "moderate",
-        "rank": 7
+        "rank": 7,
     },
     "gemini-2.5-pro": {
         "multiplier": 1.0,
@@ -155,9 +162,8 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "categories": [TaskCategory.ARCHITECTURE, TaskCategory.OPTIMIZATION, TaskCategory.REVIEW],
         "benchmark_note": "Massive 1M context. Entire codebase analysis. Architecture decisions.",
         "tier": "moderate",
-        "rank": 8
+        "rank": 8,
     },
-
     # ─── EXPENSIVE TIER (Use sparingly) ────────────────────────────
     "claude-opus-4.5": {
         "multiplier": 3.0,
@@ -168,7 +174,7 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "categories": [TaskCategory.ARCHITECTURE, TaskCategory.DEBUGGING],
         "benchmark_note": "Near-perfect. Complex debugging, critical architecture. 100 uses/month.",
         "tier": "expensive",
-        "rank": 9
+        "rank": 9,
     },
     "claude-opus-4": {
         "multiplier": 10.0,
@@ -179,9 +185,8 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "categories": [TaskCategory.ARCHITECTURE],
         "benchmark_note": "10× cost (30 uses/month). Expert-level only. Security audits, migrations.",
         "tier": "expensive",
-        "rank": 10
+        "rank": 10,
     },
-
     # ─── AVOID TIER (Extremely expensive) ──────────────────────────
     "gpt-4.5": {
         "multiplier": 50.0,
@@ -192,56 +197,95 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "categories": [TaskCategory.DEBUGGING],
         "benchmark_note": "50× cost (6 uses/month). AVOID. Only for impossible edge cases.",
         "tier": "avoid",
-        "rank": 11
-    }
+        "rank": 11,
+    },
 }
 
 # Complexity detection signals
 COMPLEXITY_SIGNALS: dict[Complexity, dict[str, Any]] = {
     Complexity.TRIVIAL: {
         "keywords": [
-            "typo", "rename", "add comment", "fix indent",
-            "add semicolon", "format", "whitespace", "spelling"
+            "typo",
+            "rename",
+            "add comment",
+            "fix indent",
+            "add semicolon",
+            "format",
+            "whitespace",
+            "spelling",
         ],
         "max_files": 1,
-        "max_lines_changed": 5
+        "max_lines_changed": 5,
     },
     Complexity.SIMPLE: {
         "keywords": [
-            "add", "create function", "write", "generate",
-            "simple", "basic", "boilerplate", "crud", "hello world",
-            "getter", "setter", "property"
+            "add",
+            "create function",
+            "write",
+            "generate",
+            "simple",
+            "basic",
+            "boilerplate",
+            "crud",
+            "hello world",
+            "getter",
+            "setter",
+            "property",
         ],
         "max_files": 2,
-        "max_lines_changed": 50
+        "max_lines_changed": 50,
     },
     Complexity.MODERATE: {
         "keywords": [
-            "refactor", "improve", "update logic", "restructure",
-            "connect", "integrate", "add feature", "unit test",
-            "validate", "sanitize", "middleware"
+            "refactor",
+            "improve",
+            "update logic",
+            "restructure",
+            "connect",
+            "integrate",
+            "add feature",
+            "unit test",
+            "validate",
+            "sanitize",
+            "middleware",
         ],
         "max_files": 5,
-        "max_lines_changed": 200
+        "max_lines_changed": 200,
     },
     Complexity.COMPLEX: {
         "keywords": [
-            "architect", "design", "migrate", "multi-file",
-            "optimize performance", "security audit", "refactor all",
-            "system", "module", "service", "database schema"
+            "architect",
+            "design",
+            "migrate",
+            "multi-file",
+            "optimize performance",
+            "security audit",
+            "refactor all",
+            "system",
+            "module",
+            "service",
+            "database schema",
         ],
         "max_files": 20,
-        "max_lines_changed": 1000
+        "max_lines_changed": 1000,
     },
     Complexity.EXPERT: {
         "keywords": [
-            "distributed", "microservices", "real-time", "scalability",
-            "zero-downtime", "critical path", "consensus", "sharding",
-            "security critical", "compliance", "fault-tolerant"
+            "distributed",
+            "microservices",
+            "real-time",
+            "scalability",
+            "zero-downtime",
+            "critical path",
+            "consensus",
+            "sharding",
+            "security critical",
+            "compliance",
+            "fault-tolerant",
         ],
         "max_files": 999,
-        "max_lines_changed": 99999
-    }
+        "max_lines_changed": 99999,
+    },
 }
 
 # Category detection keywords
@@ -255,7 +299,7 @@ CATEGORY_KEYWORDS: dict[TaskCategory, list[str]] = {
     TaskCategory.DEBUGGING: ["debug", "why", "trace", "log", "inspect", "investigate"],
     TaskCategory.REVIEW: ["review", "check", "audit", "validate", "analyze"],
     TaskCategory.GENERATION: ["create", "write", "generate", "build", "implement", "add"],
-    TaskCategory.COMPLETION: ["complete", "finish", "suggest", "next", "continue"]
+    TaskCategory.COMPLETION: ["complete", "finish", "suggest", "next", "continue"],
 }
 
 
@@ -297,11 +341,7 @@ class BudgetTracker:
     def consume(self, multiplier: float, model: str = "") -> None:
         """Record budget consumption."""
         self.used += multiplier
-        self._history.append({
-            "multiplier": multiplier,
-            "model": model,
-            "running_total": self.used
-        })
+        self._history.append({"multiplier": multiplier, "model": model, "running_total": self.used})
 
     @property
     def remaining(self) -> float:
@@ -330,26 +370,23 @@ class AdaptiveLearner:
         category: TaskCategory,
         model: str,
         success: bool,
-        user_feedback: str | None = None
+        user_feedback: str | None = None,
     ) -> None:
         """Record a task execution result."""
-        self._history.append({
-            "complexity": complexity,
-            "category": category,
-            "model": model,
-            "success": success,
-            "feedback": user_feedback
-        })
+        self._history.append(
+            {
+                "complexity": complexity,
+                "category": category,
+                "model": model,
+                "success": success,
+                "feedback": user_feedback,
+            }
+        )
 
-    def get_best_model(
-        self,
-        complexity: Complexity,
-        category: TaskCategory
-    ) -> str | None:
+    def get_best_model(self, complexity: Complexity, category: TaskCategory) -> str | None:
         """Get the best model for this task type based on history."""
         relevant = [
-            h for h in self._history
-            if h["complexity"] == complexity and h["category"] == category
+            h for h in self._history if h["complexity"] == complexity and h["category"] == category
         ]
 
         if len(relevant) < self.min_samples:
@@ -375,10 +412,10 @@ class AdaptiveLearner:
 class TaskRouter:
     """
     Intelligent task routing engine.
-    
+
     Routes tasks to the optimal model based on complexity,
     category, budget, and learned preferences.
-    
+
     Example:
         >>> router = TaskRouter()
         >>> decision = router.route("fix the authentication bug in auth.js")
@@ -390,18 +427,14 @@ class TaskRouter:
         self.budget = BudgetTracker(self.config.monthly_premium_limit)
         self.learner = AdaptiveLearner(self.config.min_samples_for_learning)
 
-    def route(
-        self,
-        request: str,
-        workspace: dict[str, Any] | None = None
-    ) -> RoutingDecision:
+    def route(self, request: str, workspace: dict[str, Any] | None = None) -> RoutingDecision:
         """
         Route a task to the optimal model.
-        
+
         Args:
             request: The user's task description
             workspace: Optional workspace context (affected files, etc.)
-            
+
         Returns:
             RoutingDecision with model selection and reasoning
         """
@@ -444,14 +477,10 @@ class TaskRouter:
             reasoning=self._explain(selected, complexity, category),
             fallback_chain=fallbacks,
             premium_requests_cost=profile["multiplier"],
-            quality_boosters=boosters
+            quality_boosters=boosters,
         )
 
-    def _detect_complexity(
-        self,
-        request: str,
-        workspace: dict[str, Any]
-    ) -> Complexity:
+    def _detect_complexity(self, request: str, workspace: dict[str, Any]) -> Complexity:
         """Detect task complexity from request and context."""
         request_lower = request.lower()
         file_count = workspace.get("affected_files", 1)
@@ -459,10 +488,7 @@ class TaskRouter:
         # Score each complexity level
         scores: dict[Complexity, int] = {}
         for level, signals in COMPLEXITY_SIGNALS.items():
-            keyword_hits = sum(
-                1 for kw in signals["keywords"]
-                if kw in request_lower
-            )
+            keyword_hits = sum(1 for kw in signals["keywords"] if kw in request_lower)
             scores[level] = keyword_hits
 
         # Scope override based on file count
@@ -498,14 +524,10 @@ class TaskRouter:
 
         return best_category
 
-    def _get_candidates(
-        self,
-        complexity: Complexity,
-        category: TaskCategory
-    ) -> list[str]:
+    def _get_candidates(self, complexity: Complexity, category: TaskCategory) -> list[str]:
         """
         Get candidate models using smart ranking strategy.
-        
+
         Strategy:
         1. Filter by capability (complexity + category match)
         2. Exclude "avoid" tier unless EXPERT complexity
@@ -527,11 +549,13 @@ class TaskRouter:
                 candidates.append(name)
 
         # Smart sort: tier priority first, then rank within tier
-        candidates.sort(key=lambda m: (
-            tier_priority.get(MODEL_PROFILES[m].get("tier", "moderate"), 2),
-            MODEL_PROFILES[m].get("rank", 99),
-            MODEL_PROFILES[m]["multiplier"]
-        ))
+        candidates.sort(
+            key=lambda m: (
+                tier_priority.get(MODEL_PROFILES[m].get("tier", "moderate"), 2),
+                MODEL_PROFILES[m].get("rank", 99),
+                MODEL_PROFILES[m]["multiplier"],
+            )
+        )
 
         # Ensure at least one candidate
         if not candidates:
@@ -540,19 +564,16 @@ class TaskRouter:
         return candidates
 
     def _select_optimal(
-        self,
-        candidates: list[str],
-        complexity: Complexity,
-        category: TaskCategory | None = None
+        self, candidates: list[str], complexity: Complexity, category: TaskCategory | None = None
     ) -> str:
         """
         Select optimal model balancing QUALITY and COST based on complexity.
-        
+
         Strategy:
         - TRIVIAL/SIMPLE: Maximize cost savings (free models preferred)
         - MODERATE: Balance quality and cost (value optimization)
         - COMPLEX/EXPERT: Prioritize quality (best model affordable)
-        
+
         "Quality of work matters" - don't sacrifice results for savings.
         """
         # Quality thresholds per complexity
@@ -561,7 +582,7 @@ class TaskRouter:
             Complexity.SIMPLE: self.config.simple_quality_threshold,
             Complexity.MODERATE: self.config.moderate_quality_threshold,
             Complexity.COMPLEX: self.config.complex_quality_threshold,
-            Complexity.EXPERT: self.config.expert_quality_threshold
+            Complexity.EXPERT: self.config.expert_quality_threshold,
         }
         threshold = thresholds.get(complexity, 0.85)
 
@@ -578,11 +599,7 @@ class TaskRouter:
         # For MODERATE: balance quality and cost with value scoring
         return self._select_best_value(candidates, threshold, complexity)
 
-    def _select_highest_quality(
-        self,
-        candidates: list[str],
-        min_threshold: float
-    ) -> str:
+    def _select_highest_quality(self, candidates: list[str], min_threshold: float) -> str:
         """Select highest quality model we can afford. Quality > Cost."""
         best_model = None
         best_quality = 0.0
@@ -604,11 +621,7 @@ class TaskRouter:
 
         return best_model or candidates[0] if candidates else "gpt-4.1"
 
-    def _select_cheapest_adequate(
-        self,
-        candidates: list[str],
-        min_threshold: float
-    ) -> str:
+    def _select_cheapest_adequate(self, candidates: list[str], min_threshold: float) -> str:
         """Select cheapest model meeting threshold. Cost > Quality."""
         # Candidates already sorted by cost, pick first adequate one
         for model in candidates:
@@ -620,10 +633,7 @@ class TaskRouter:
         return candidates[0] if candidates else "gpt-4.1"
 
     def _select_best_value(
-        self,
-        candidates: list[str],
-        min_threshold: float,
-        complexity: Complexity
+        self, candidates: list[str], min_threshold: float, complexity: Complexity
     ) -> str:
         """Select best value model (quality-adjusted cost). Balanced approach."""
         scored_candidates: list[tuple[str, float]] = []
@@ -640,18 +650,18 @@ class TaskRouter:
 
             # Value score: quality^2 / cost (quality weighted more)
             cost = max(profile["multiplier"], 0.1)
-            value_score = (quality ** 2) / cost
+            value_score = (quality**2) / cost
 
             # Tier adjustments (less aggressive than before)
             tier = profile.get("tier", "moderate")
             if tier == "free":
-                value_score *= 2.0   # Moderate bonus for free
+                value_score *= 2.0  # Moderate bonus for free
             elif tier == "cheap":
-                value_score *= 1.5   # Small bonus for cheap
+                value_score *= 1.5  # Small bonus for cheap
             elif tier == "expensive":
-                value_score *= 0.8   # Slight penalty
+                value_score *= 0.8  # Slight penalty
             elif tier == "avoid":
-                value_score *= 0.3   # Strong penalty
+                value_score *= 0.3  # Strong penalty
 
             # Context window bonus for large files
             if profile["context_window"] >= 500_000:
@@ -678,14 +688,11 @@ class TaskRouter:
         return base
 
     def _get_boosters(
-        self,
-        model: str,
-        complexity: Complexity,
-        category: TaskCategory
+        self, model: str, complexity: Complexity, category: TaskCategory
     ) -> list[str]:
         """
         Get quality boosters needed for this combination.
-        
+
         Boosters enhance cheaper models to produce premium output.
         """
         boosters = []
@@ -697,7 +704,7 @@ class TaskRouter:
             Complexity.SIMPLE: 0.82,
             Complexity.MODERATE: 0.88,
             Complexity.COMPLEX: 0.93,
-            Complexity.EXPERT: 0.97
+            Complexity.EXPERT: 0.97,
         }
 
         # Add boosters if model quality < demand
@@ -720,12 +727,7 @@ class TaskRouter:
 
         return boosters
 
-    def _explain(
-        self,
-        model: str,
-        complexity: Complexity,
-        category: TaskCategory
-    ) -> str:
+    def _explain(self, model: str, complexity: Complexity, category: TaskCategory) -> str:
         """Generate human-readable routing explanation."""
         profile = MODEL_PROFILES[model]
         return (
@@ -736,10 +738,7 @@ class TaskRouter:
         )
 
     def record_result(
-        self,
-        decision: RoutingDecision,
-        success: bool,
-        feedback: str | None = None
+        self, decision: RoutingDecision, success: bool, feedback: str | None = None
     ) -> None:
         """Record task result for adaptive learning."""
         # Update budget
@@ -748,9 +747,5 @@ class TaskRouter:
         # Record for learning
         if self.config.adaptive_learning_enabled:
             self.learner.record(
-                decision.complexity,
-                decision.category,
-                decision.model,
-                success,
-                feedback
+                decision.complexity, decision.category, decision.model, success, feedback
             )

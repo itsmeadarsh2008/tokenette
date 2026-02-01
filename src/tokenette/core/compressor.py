@@ -20,9 +20,11 @@ from tokenette.config import CompressionConfig
 
 try:
     import orjson
+
     HAS_ORJSON = True
 except ImportError:
     import json as stdlib_json
+
     HAS_ORJSON = False
 
 
@@ -47,15 +49,15 @@ class CompressionResult:
 class SemanticCompressor:
     """
     Semantic compression with quality preservation.
-    
+
     Applies multiple compression stages:
     1. Deduplication: Remove duplicate structures
     2. Reference Extraction: Replace repeated objects with refs
     3. Large Text Compression: Summarize while preserving key info
-    
+
     All compression maintains >0.95 semantic similarity to ensure
     zero quality loss.
-    
+
     Example:
         >>> compressor = SemanticCompressor()
         >>> result = compressor.compress(large_data)
@@ -65,33 +67,29 @@ class SemanticCompressor:
 
     # Key patterns to preserve during text compression
     KEY_PATTERNS = [
-        r'^\s*(def|class|function|async|export|import)\s+\w+',  # Definitions
-        r'^\s*#.*$',          # Python comments/headers
-        r'^\s*//.*$',         # JS comments
-        r'^\s*/\*\*',         # JSDoc start
-        r'^\s*@\w+',          # Decorators/annotations
-        r'^\s*return\s+',     # Return statements
-        r'^\s*raise\s+',      # Exceptions
-        r'^\s*throw\s+',      # JS throw
-        r'TODO|FIXME|XXX',    # Important markers
+        r"^\s*(def|class|function|async|export|import)\s+\w+",  # Definitions
+        r"^\s*#.*$",  # Python comments/headers
+        r"^\s*//.*$",  # JS comments
+        r"^\s*/\*\*",  # JSDoc start
+        r"^\s*@\w+",  # Decorators/annotations
+        r"^\s*return\s+",  # Return statements
+        r"^\s*raise\s+",  # Exceptions
+        r"^\s*throw\s+",  # JS throw
+        r"TODO|FIXME|XXX",  # Important markers
     ]
 
     def __init__(self, config: CompressionConfig | None = None):
         self.config = config or CompressionConfig()
         self._key_regex = [re.compile(p, re.MULTILINE | re.IGNORECASE) for p in self.KEY_PATTERNS]
 
-    def compress(
-        self,
-        data: Any,
-        context: dict[str, Any] | None = None
-    ) -> CompressionResult:
+    def compress(self, data: Any, context: dict[str, Any] | None = None) -> CompressionResult:
         """
         Apply semantic compression pipeline.
-        
+
         Args:
             data: Data to compress
             context: Optional context for compression decisions
-            
+
         Returns:
             CompressionResult with compressed data and metrics
         """
@@ -122,7 +120,9 @@ class SemanticCompressor:
 
         # Validate quality
         quality_score = self._calculate_quality(original, result)
-        savings_pct = round((1 - result_tokens / original_tokens) * 100, 1) if original_tokens > 0 else 0.0
+        savings_pct = (
+            round((1 - result_tokens / original_tokens) * 100, 1) if original_tokens > 0 else 0.0
+        )
 
         # Fallback if quality is too low
         if quality_score < self.config.min_quality_score:
@@ -133,7 +133,7 @@ class SemanticCompressor:
                 quality_score=1.0,
                 savings_pct=0.0,
                 reversible=True,
-                techniques_applied=["fallback_to_original"]
+                techniques_applied=["fallback_to_original"],
             )
 
         return CompressionResult(
@@ -143,7 +143,7 @@ class SemanticCompressor:
             quality_score=quality_score,
             savings_pct=savings_pct,
             reversible=True,
-            techniques_applied=techniques
+            techniques_applied=techniques,
         )
 
     def _serialize(self, data: Any) -> str:
@@ -161,7 +161,7 @@ class SemanticCompressor:
     def _deduplicate(self, data: Any) -> Any:
         """
         Remove duplicate structures from data.
-        
+
         For lists: Remove exact duplicate items
         For dicts: Recursively deduplicate nested structures
         """
@@ -184,13 +184,13 @@ class SemanticCompressor:
     def _extract_references(self, data: Any) -> Any:
         """
         Extract repeated objects and replace with _ref pointers.
-        
+
         Before:
         {
             "user1": {"id": 1, "role": {"name": "admin", "permissions": [...]}},
             "user2": {"id": 2, "role": {"name": "admin", "permissions": [...]}}
         }
-        
+
         After:
         {
             "_refs": {"r0": {"name": "admin", "permissions": [...]}},
@@ -238,14 +238,14 @@ class SemanticCompressor:
     def _compress_large_text(self, text: str, context: dict[str, Any]) -> str:
         """
         Compress large text while preserving key information.
-        
+
         Extracts:
         - Function/class definitions
         - Important comments (TODO, FIXME, etc.)
         - Return/raise statements
         - Decorators and annotations
         """
-        lines = text.split('\n')
+        lines = text.split("\n")
         key_lines = []
         context_lines = []  # Lines before/after key lines
 
@@ -277,24 +277,20 @@ class SemanticCompressor:
         if prev_idx < len(lines) - 1:
             result_lines.append("...")
 
-        return '\n'.join(result_lines)
+        return "\n".join(result_lines)
 
     def _calculate_quality(self, original: str, compressed: str) -> float:
         """
         Calculate semantic similarity between original and compressed.
-        
+
         Uses multiple heuristics:
         - Key pattern preservation
         - Token overlap
         - Structure preservation
         """
         # Count preserved key patterns
-        original_keys = sum(
-            len(regex.findall(original)) for regex in self._key_regex
-        )
-        compressed_keys = sum(
-            len(regex.findall(compressed)) for regex in self._key_regex
-        )
+        original_keys = sum(len(regex.findall(original)) for regex in self._key_regex)
+        compressed_keys = sum(len(regex.findall(compressed)) for regex in self._key_regex)
 
         key_preservation = compressed_keys / original_keys if original_keys > 0 else 1.0
 
@@ -311,16 +307,14 @@ class SemanticCompressor:
             # Count structure markers
             original_markers = original.count("{") + original.count("[")
             compressed_markers = compressed.count("{") + compressed.count("[")
-            structure_pres = min(1.0, compressed_markers / original_markers) if original_markers > 0 else 1.0
+            structure_pres = (
+                min(1.0, compressed_markers / original_markers) if original_markers > 0 else 1.0
+            )
         else:
             structure_pres = 1.0
 
         # Weighted average
-        quality = (
-            0.4 * key_preservation +
-            0.3 * token_overlap +
-            0.3 * structure_pres
-        )
+        quality = 0.4 * key_preservation + 0.3 * token_overlap + 0.3 * structure_pres
 
         return round(min(1.0, quality), 3)
 
@@ -328,7 +322,7 @@ class SemanticCompressor:
     def expand_references(data: dict[str, Any]) -> Any:
         """
         Expand _ref pointers back to full objects.
-        
+
         Used client-side to restore original structure.
         """
         if not isinstance(data, dict):

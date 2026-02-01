@@ -67,23 +67,23 @@ class OptimizationResult:
                 "original": self.original_tokens,
                 "final": self.final_tokens,
                 "saved": self.tokens_saved,
-                "savings_pct": self.savings_pct
+                "savings_pct": self.savings_pct,
             },
             "_quality": self.quality_score,
             "_latency_ms": self.total_latency_ms,
             "_format": self.format_hint,
             "_instruction": self.client_instruction,
-            "data": self.data
+            "data": self.data,
         }
 
 
 class OptimizationPipeline:
     """
     Full token optimization pipeline.
-    
+
     Orchestrates cache, minification, and compression stages
     for maximum token savings while maintaining quality.
-    
+
     Example:
         >>> pipeline = OptimizationPipeline()
         >>> result = await pipeline.optimize(large_data)
@@ -107,17 +107,17 @@ class OptimizationPipeline:
         data: Any,
         cache_key: str | None = None,
         skip_cache: bool = False,
-        content_type: Literal["auto", "json", "code", "toon", "text"] = "auto"
+        content_type: Literal["auto", "json", "code", "toon", "text"] = "auto",
     ) -> OptimizationResult:
         """
         Run data through the full optimization pipeline.
-        
+
         Args:
             data: Data to optimize
             cache_key: Custom cache key (auto-generated if None)
             skip_cache: Skip cache lookup (useful for mutations)
             content_type: Force content type or auto-detect
-            
+
         Returns:
             OptimizationResult with optimized data and metrics
         """
@@ -157,7 +157,7 @@ class OptimizationPipeline:
                 total_latency_ms=total_latency,
                 cache_latency_ms=cache_latency,
                 stages_applied=stages,
-                format_hint=content_type if content_type != "auto" else None
+                format_hint=content_type if content_type != "auto" else None,
             )
 
         stages.append("cache_miss")
@@ -187,7 +187,9 @@ class OptimizationPipeline:
         # Final token count
         final_tokens = self._estimate_tokens(current_data)
         tokens_saved = original_tokens - final_tokens
-        savings_pct = round((1 - final_tokens / original_tokens) * 100, 1) if original_tokens > 0 else 0.0
+        savings_pct = (
+            round((1 - final_tokens / original_tokens) * 100, 1) if original_tokens > 0 else 0.0
+        )
 
         # Cache the result
         if not skip_cache:
@@ -215,21 +217,19 @@ class OptimizationPipeline:
             compress_latency_ms=compress_latency,
             stages_applied=stages,
             client_instruction="format_on_display",
-            format_hint=minify_result.format
+            format_hint=minify_result.format,
         )
 
     async def optimize_batch(
-        self,
-        items: list[tuple[str, Any]],
-        skip_cache: bool = False
+        self, items: list[tuple[str, Any]], skip_cache: bool = False
     ) -> list[OptimizationResult]:
         """
         Optimize multiple items with cross-item deduplication.
-        
+
         Args:
             items: List of (cache_key, data) tuples
             skip_cache: Skip cache lookup
-            
+
         Returns:
             List of OptimizationResults
         """
@@ -260,6 +260,7 @@ class OptimizationPipeline:
     def _estimate_tokens(self, data: Any) -> int:
         """Estimate token count."""
         import json
+
         if isinstance(data, str):
             return max(1, len(data) // 4)
         try:
@@ -284,7 +285,11 @@ class OptimizationPipeline:
             "total_optimizations": self._total_optimizations,
             "total_tokens_saved": self._total_tokens_saved,
             "total_cache_hits": self._total_cache_hits,
-            "cache_hit_rate": self._total_cache_hits / self._total_optimizations if self._total_optimizations > 0 else 0.0,
-            "avg_tokens_saved_per_op": self._total_tokens_saved / self._total_optimizations if self._total_optimizations > 0 else 0,
-            **cache_stats
+            "cache_hit_rate": self._total_cache_hits / self._total_optimizations
+            if self._total_optimizations > 0
+            else 0.0,
+            "avg_tokens_saved_per_op": self._total_tokens_saved / self._total_optimizations
+            if self._total_optimizations > 0
+            else 0,
+            **cache_stats,
         }

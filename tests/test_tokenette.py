@@ -4,10 +4,10 @@ Tokenette Tests
 Basic test suite for the Tokenette MCP server.
 """
 
-
 import pytest
 
 # ─── CONFIG TESTS ────────────────────────────────────────────────
+
 
 class TestConfig:
     """Test configuration system."""
@@ -27,14 +27,14 @@ class TestConfig:
         from tokenette.config import TokenetteConfig
 
         config = TokenetteConfig(
-            cache={"l1_max_size_mb": 50},
-            router={"monthly_premium_limit": 500}
+            cache={"l1_max_size_mb": 50}, router={"monthly_premium_limit": 500}
         )
         assert config.cache.l1_max_size_mb == 50
         assert config.router.monthly_premium_limit == 500
 
 
 # ─── CACHE TESTS ─────────────────────────────────────────────────
+
 
 class TestCache:
     """Test multi-layer cache."""
@@ -43,6 +43,7 @@ class TestCache:
     def cache(self):
         from tokenette.config import CacheConfig
         from tokenette.core.cache import MultiLayerCache
+
         return MultiLayerCache(CacheConfig())
 
     @pytest.mark.asyncio
@@ -61,11 +62,12 @@ class TestCache:
         result = await cache.get("nonexistent_key")
         # Cache miss returns CacheResult with hit=False, not None
         assert result is not None
-        assert result.hit == False
+        assert not result.hit
         assert result.layer == "MISS"
 
 
 # ─── MINIFIER TESTS ──────────────────────────────────────────────
+
 
 class TestMinifier:
     """Test minification engine."""
@@ -73,6 +75,7 @@ class TestMinifier:
     @pytest.fixture
     def minifier(self):
         from tokenette.core.minifier import MinificationEngine
+
         return MinificationEngine()
 
     def test_json_minification(self, minifier):
@@ -80,11 +83,8 @@ class TestMinifier:
         # Use a larger JSON with more whitespace to show savings
         data = {
             "key": "value",
-            "nested": {
-                "inner": "data",
-                "another": "field"
-            },
-            "list": [1, 2, 3, 4, 5]
+            "nested": {"inner": "data", "another": "field"},
+            "list": [1, 2, 3, 4, 5],
         }
         result = minifier.minify(data, content_type="json")
 
@@ -93,14 +93,14 @@ class TestMinifier:
 
     def test_code_minification(self, minifier):
         """Test code minification."""
-        code = '''
+        code = """
 # This is a comment
 def hello():
     # Another comment
     return "world"
-    
-    
-'''
+
+
+"""
         result = minifier.minify(code, content_type="code")
 
         assert result.format == "code"
@@ -112,7 +112,7 @@ def hello():
         data = [
             {"name": "Alice", "age": 30},
             {"name": "Bob", "age": 25},
-            {"name": "Charlie", "age": 35}
+            {"name": "Charlie", "age": 35},
         ]
         result = minifier.minify(data, content_type="toon")
 
@@ -123,6 +123,7 @@ def hello():
 
 # ─── ROUTER TESTS ────────────────────────────────────────────────
 
+
 class TestRouter:
     """Test task routing engine."""
 
@@ -130,6 +131,7 @@ class TestRouter:
     def router(self):
         from tokenette.config import RouterConfig
         from tokenette.core.router import TaskRouter
+
         return TaskRouter(RouterConfig())
 
     def test_trivial_task_routing(self, router):
@@ -142,8 +144,7 @@ class TestRouter:
     def test_complex_task_routing(self, router):
         """Test complex tasks prioritize quality over cost."""
         decision = router.route(
-            "architect a distributed microservices system",
-            {"affected_files": 20}
+            "architect a distributed microservices system", {"affected_files": 20}
         )
 
         assert decision.complexity.name in ["COMPLEX", "EXPERT"]
@@ -155,16 +156,14 @@ class TestRouter:
 
     def test_quality_boosters(self, router):
         """Test quality boosters are assigned."""
-        decision = router.route(
-            "refactor authentication module",
-            {"affected_files": 5}
-        )
+        decision = router.route("refactor authentication module", {"affected_files": 5})
 
         assert len(decision.quality_boosters) > 0
         assert "post_validation" in decision.quality_boosters
 
 
 # ─── AMPLIFIER TESTS ─────────────────────────────────────────────
+
 
 class TestAmplifier:
     """Test quality amplification."""
@@ -173,15 +172,13 @@ class TestAmplifier:
     def amplifier(self):
         from tokenette.config import AmplifierConfig
         from tokenette.core.amplifier import QualityAmplifier
+
         return QualityAmplifier(AmplifierConfig())
 
     def test_expert_framing(self, amplifier):
         """Test expert role framing is applied."""
         result = amplifier.amplify(
-            "Write a function",
-            boosters=["expert_role_framing"],
-            category="generation",
-            context={}
+            "Write a function", boosters=["expert_role_framing"], category="generation", context={}
         )
 
         # AmplificationResult has 'prompt' not 'enhanced_prompt'
@@ -194,7 +191,7 @@ class TestAmplifier:
             "Debug this code",
             boosters=["chain_of_thought_injection"],
             category="debugging",
-            context={}
+            context={},
         )
 
         assert "step by step" in result.prompt.lower()
@@ -202,20 +199,18 @@ class TestAmplifier:
     def test_amplification_result_structure(self, amplifier):
         """Test AmplificationResult has expected fields."""
         result = amplifier.amplify(
-            "Simple task",
-            boosters=["expert_role_framing"],
-            category="generation",
-            context={}
+            "Simple task", boosters=["expert_role_framing"], category="generation", context={}
         )
 
-        assert hasattr(result, 'prompt')
-        assert hasattr(result, 'original_length')
-        assert hasattr(result, 'amplified_length')
-        assert hasattr(result, 'boosters_applied')
+        assert hasattr(result, "prompt")
+        assert hasattr(result, "original_length")
+        assert hasattr(result, "amplified_length")
+        assert hasattr(result, "boosters_applied")
         assert result.amplified_length > result.original_length
 
 
 # ─── OPTIMIZER TESTS ─────────────────────────────────────────────
+
 
 class TestOptimizer:
     """Test optimization pipeline."""
@@ -233,7 +228,7 @@ class TestOptimizer:
         data = {
             "users": [
                 {"name": "Alice", "email": "alice@example.com"},
-                {"name": "Bob", "email": "bob@example.com"}
+                {"name": "Bob", "email": "bob@example.com"},
             ]
         }
 
@@ -248,14 +243,15 @@ class TestOptimizer:
 
         result = await optimizer.optimize(data, content_type="json")
 
-        assert hasattr(result, 'data')
-        assert hasattr(result, 'source')
-        assert hasattr(result, 'original_tokens')
-        assert hasattr(result, 'final_tokens')
-        assert hasattr(result, 'quality_score')
+        assert hasattr(result, "data")
+        assert hasattr(result, "source")
+        assert hasattr(result, "original_tokens")
+        assert hasattr(result, "final_tokens")
+        assert hasattr(result, "quality_score")
 
 
 # ─── FILE OPS TESTS ──────────────────────────────────────────────
+
 
 class TestFileOps:
     """Test file operations."""
@@ -312,6 +308,7 @@ class Greeter:
 
 # ─── ANALYSIS TESTS ──────────────────────────────────────────────
 
+
 class TestAnalysis:
     """Test code analysis tools."""
 
@@ -319,7 +316,7 @@ class TestAnalysis:
     def temp_python_file(self, tmp_path):
         """Create a file with known issues."""
         file = tmp_path / "buggy.py"
-        file.write_text('''
+        file.write_text("""
 password = "secret123"  # Security issue
 
 def process():
@@ -327,10 +324,10 @@ def process():
         do_something()
     except:  # Bare except
         pass
-    
+
     if x == True:  # Style issue
         return x
-''')
+""")
         return file
 
     @pytest.mark.asyncio
@@ -350,7 +347,7 @@ def process():
 
         # Create a file with some complexity
         file = tmp_path / "complex.py"
-        file.write_text('''
+        file.write_text("""
 def complex_function(x, y, z):
     if x > 0:
         if y > 0:
@@ -365,7 +362,7 @@ def complex_function(x, y, z):
             if i % 2 == 0:
                 print(i)
         return 0
-''')
+""")
 
         result = await get_complexity(str(file))
 
@@ -374,6 +371,7 @@ def complex_function(x, y, z):
 
 
 # ─── INTEGRATION TESTS ───────────────────────────────────────────
+
 
 class TestIntegration:
     """Integration tests for the full system."""

@@ -16,6 +16,7 @@ from typing import Any
 @dataclass
 class GitDiff:
     """Optimized git diff result."""
+
     files_changed: int
     insertions: int
     deletions: int
@@ -27,6 +28,7 @@ class GitDiff:
 @dataclass
 class GitBlame:
     """Optimized git blame result."""
+
     file: str
     lines: list[dict[str, Any]]
     authors: list[str]
@@ -36,6 +38,7 @@ class GitBlame:
 @dataclass
 class GitHistory:
     """Compressed commit history."""
+
     commits: list[dict[str, str]]
     total_commits: int
     date_range: str
@@ -46,10 +49,7 @@ async def run_git_command(cmd: list[str], cwd: str | None = None) -> tuple[str, 
     """Run a git command asynchronously."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=cwd
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, cwd=cwd
         )
         stdout, stderr = await proc.communicate()
         return stdout.decode("utf-8", errors="replace"), proc.returncode or 0
@@ -62,18 +62,18 @@ async def get_git_diff(
     staged: bool = False,
     context_lines: int = 3,
     ignore_whitespace: bool = True,
-    files: list[str] | None = None
+    files: list[str] | None = None,
 ) -> GitDiff:
     """
     Get optimized git diff with smart compression.
-    
+
     Args:
         path: Repository path
         staged: Show staged changes only
         context_lines: Lines of context (default 3, less = smaller)
         ignore_whitespace: Ignore whitespace changes
         files: Specific files to diff (optional)
-    
+
     Returns:
         GitDiff with compressed output
     """
@@ -102,7 +102,7 @@ async def get_git_diff(
             deletions=0,
             diff="",
             summary="No changes or not a git repository",
-            tokens_saved=0
+            tokens_saved=0,
         )
 
     # Get actual diff without stat
@@ -147,7 +147,7 @@ async def get_git_diff(
         deletions=deletions,
         diff=compressed_diff,
         summary=f"{files_changed} files: +{insertions} -{deletions}",
-        tokens_saved=max(0, tokens_saved)
+        tokens_saved=max(0, tokens_saved),
     )
 
 
@@ -186,17 +186,17 @@ async def get_git_blame(
     file_path: str,
     start_line: int | None = None,
     end_line: int | None = None,
-    show_email: bool = False
+    show_email: bool = False,
 ) -> GitBlame:
     """
     Get optimized git blame for a file or section.
-    
+
     Args:
         file_path: Path to file
         start_line: Starting line (1-indexed)
         end_line: Ending line (inclusive)
         show_email: Include author emails
-    
+
     Returns:
         GitBlame with compressed output
     """
@@ -213,12 +213,7 @@ async def get_git_blame(
     output, code = await run_git_command(cmd)
 
     if code != 0:
-        return GitBlame(
-            file=file_path,
-            lines=[],
-            authors=[],
-            summary="Unable to get blame info"
-        )
+        return GitBlame(file=file_path, lines=[], authors=[], summary="Unable to get blame info")
 
     # Parse porcelain format
     lines = []
@@ -245,7 +240,7 @@ async def get_git_blame(
         file=file_path,
         lines=compressed_lines,
         authors=list(authors),
-        summary=f"{len(lines)} lines, {len(authors)} authors"
+        summary=f"{len(lines)} lines, {len(authors)} authors",
     )
 
 
@@ -259,7 +254,7 @@ def _compress_blame(lines: list[dict]) -> list[dict]:
         "author": lines[0].get("author", "unknown"),
         "start_line": 1,
         "end_line": 1,
-        "commit_msg": lines[0].get("commit_msg", "")
+        "commit_msg": lines[0].get("commit_msg", ""),
     }
 
     for i, line in enumerate(lines[1:], start=2):
@@ -271,7 +266,7 @@ def _compress_blame(lines: list[dict]) -> list[dict]:
                 "author": line.get("author", "unknown"),
                 "start_line": i,
                 "end_line": i,
-                "commit_msg": line.get("commit_msg", "")
+                "commit_msg": line.get("commit_msg", ""),
             }
 
     compressed.append(current_group)
@@ -284,11 +279,11 @@ async def get_git_history(
     file_path: str | None = None,
     author: str | None = None,
     since: str | None = None,
-    format_type: str = "compact"
+    format_type: str = "compact",
 ) -> GitHistory:
     """
     Get compressed commit history.
-    
+
     Args:
         path: Repository path
         max_commits: Maximum commits to return
@@ -296,14 +291,11 @@ async def get_git_history(
         author: Filter by author
         since: Date filter (e.g., "2 weeks ago")
         format_type: "compact" or "detailed"
-    
+
     Returns:
         GitHistory with optimized output
     """
-    if format_type == "compact":
-        fmt = "%h|%an|%ar|%s"
-    else:
-        fmt = "%H|%an|%ae|%ai|%s"
+    fmt = "%h|%an|%ar|%s" if format_type == "compact" else "%H|%an|%ae|%ai|%s"
 
     cmd = ["git", "log", f"--format={fmt}", f"-n{max_commits}"]
 
@@ -318,10 +310,7 @@ async def get_git_history(
 
     if code != 0:
         return GitHistory(
-            commits=[],
-            total_commits=0,
-            date_range="",
-            summary="Unable to get history"
+            commits=[], total_commits=0, date_range="", summary="Unable to get history"
         )
 
     commits = []
@@ -330,12 +319,14 @@ async def get_git_history(
             continue
         parts = line.split("|")
         if len(parts) >= 4:
-            commits.append({
-                "hash": parts[0],
-                "author": parts[1],
-                "date": parts[2] if format_type == "compact" else parts[3],
-                "message": parts[3] if format_type == "compact" else parts[4]
-            })
+            commits.append(
+                {
+                    "hash": parts[0],
+                    "author": parts[1],
+                    "date": parts[2] if format_type == "compact" else parts[3],
+                    "message": parts[3] if format_type == "compact" else parts[4],
+                }
+            )
 
     # Get total count
     count_cmd = ["git", "rev-list", "--count", "HEAD"]
@@ -350,14 +341,14 @@ async def get_git_history(
         commits=commits,
         total_commits=total,
         date_range=date_range,
-        summary=f"Showing {len(commits)}/{total} commits"
+        summary=f"Showing {len(commits)}/{total} commits",
     )
 
 
 async def get_git_status(path: str = ".") -> dict[str, Any]:
     """
     Get optimized git status.
-    
+
     Returns compact status with file counts by category.
     """
     cmd = ["git", "status", "--porcelain", "-b"]
@@ -396,23 +387,21 @@ async def get_git_status(path: str = ".") -> dict[str, Any]:
         "staged": staged,
         "unstaged": unstaged,
         "untracked": untracked,
-        "summary": f"Branch: {branch} | Staged: {len(staged)} | Modified: {len(unstaged)} | Untracked: {len(untracked)}"
+        "summary": f"Branch: {branch} | Staged: {len(staged)} | Modified: {len(unstaged)} | Untracked: {len(untracked)}",
     }
 
 
 async def get_git_branches(
-    path: str = ".",
-    remote: bool = False,
-    merged: bool | None = None
+    path: str = ".", remote: bool = False, merged: bool | None = None
 ) -> dict[str, Any]:
     """
     Get branch information.
-    
+
     Args:
         path: Repository path
         remote: Include remote branches
         merged: Filter by merged status (True/False/None for all)
-    
+
     Returns:
         Branch list with current branch highlighted
     """
@@ -441,17 +430,9 @@ async def get_git_branches(
         upstream = parts[1] if len(parts) > 1 else ""
         is_current = parts[2] == "*" if len(parts) > 2 else False
 
-        branches.append({
-            "name": name,
-            "upstream": upstream,
-            "current": is_current
-        })
+        branches.append({"name": name, "upstream": upstream, "current": is_current})
 
         if is_current:
             current = name
 
-    return {
-        "current": current,
-        "branches": branches,
-        "total": len(branches)
-    }
+    return {"current": current, "branches": branches, "total": len(branches)}

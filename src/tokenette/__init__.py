@@ -5,7 +5,7 @@ Zero-Loss Token Optimization · Intelligent Model Routing · Quality Amplificati
 
 Tokenette achieves 90-99% token reduction without sacrificing code quality through:
 - Intelligent multi-layer caching (L1-L4)
-- Semantic compression with quality preservation  
+- Semantic compression with quality preservation
 - Dynamic tool discovery (96% reduction vs. static tools)
 - Smart file operations with AST analysis
 - Context7 integration for documentation
@@ -32,7 +32,9 @@ from tokenette.core.router import Complexity, TaskCategory, TaskRouter
 # Lazy import to avoid circular dependencies
 def _get_server():
     from tokenette.server import create_server, mcp
+
     return mcp, create_server
+
 
 __version__ = "2.0.0"
 __author__ = "Adarsh"
@@ -57,6 +59,7 @@ __all__ = [
     # Metadata
     "__version__",
 ]
+
 
 # Lazy loading for server
 def __getattr__(name):

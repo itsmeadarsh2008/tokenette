@@ -39,7 +39,7 @@ class Issue:
             "file": self.file,
             "line": self.line,
             "code": self.code[:50] if self.code else "",
-            "suggestion": self.suggestion
+            "suggestion": self.suggestion,
         }
 
 
@@ -63,7 +63,7 @@ class ComplexityMetrics:
             "functions": self.functions,
             "classes": self.classes,
             "max_nesting": self.max_nesting,
-            "maintainability": round(self.maintainability_index, 1)
+            "maintainability": round(self.maintainability_index, 1),
         }
 
 
@@ -75,56 +75,56 @@ BUG_PATTERNS = {
             "type": "bug",
             "severity": "medium",
             "message": "Bare except clause catches all exceptions including KeyboardInterrupt",
-            "suggestion": "Use 'except Exception:' or specific exception types"
+            "suggestion": "Use 'except Exception:' or specific exception types",
         },
         {
             "pattern": r"eval\s*\(",
             "type": "security",
             "severity": "high",
             "message": "Use of eval() is a security risk",
-            "suggestion": "Use ast.literal_eval() for safe evaluation"
+            "suggestion": "Use ast.literal_eval() for safe evaluation",
         },
         {
             "pattern": r"exec\s*\(",
             "type": "security",
             "severity": "high",
             "message": "Use of exec() is a security risk",
-            "suggestion": "Avoid exec() or sanitize input carefully"
+            "suggestion": "Avoid exec() or sanitize input carefully",
         },
         {
             "pattern": r"password\s*=\s*['\"]",
             "type": "security",
             "severity": "high",
             "message": "Hardcoded password detected",
-            "suggestion": "Use environment variables or secrets manager"
+            "suggestion": "Use environment variables or secrets manager",
         },
         {
             "pattern": r"api_key\s*=\s*['\"]",
             "type": "security",
             "severity": "high",
             "message": "Hardcoded API key detected",
-            "suggestion": "Use environment variables"
+            "suggestion": "Use environment variables",
         },
         {
             "pattern": r"==\s*True|==\s*False",
             "type": "style",
             "severity": "low",
             "message": "Comparison to True/False is unnecessary",
-            "suggestion": "Use 'if condition:' or 'if not condition:'"
+            "suggestion": "Use 'if condition:' or 'if not condition:'",
         },
         {
             "pattern": r"from\s+\w+\s+import\s+\*",
             "type": "style",
             "severity": "medium",
             "message": "Wildcard import pollutes namespace",
-            "suggestion": "Import specific names"
+            "suggestion": "Import specific names",
         },
         {
             "pattern": r"time\.sleep\s*\(\s*\d{2,}",
             "type": "performance",
             "severity": "medium",
             "message": "Long sleep detected",
-            "suggestion": "Consider async or event-based approach"
+            "suggestion": "Consider async or event-based approach",
         },
     ],
     "javascript": [
@@ -133,44 +133,44 @@ BUG_PATTERNS = {
             "type": "security",
             "severity": "high",
             "message": "Use of eval() is a security risk",
-            "suggestion": "Avoid eval() entirely"
+            "suggestion": "Avoid eval() entirely",
         },
         {
             "pattern": r"innerHTML\s*=",
             "type": "security",
             "severity": "high",
             "message": "innerHTML assignment can lead to XSS",
-            "suggestion": "Use textContent or sanitize HTML"
+            "suggestion": "Use textContent or sanitize HTML",
         },
         {
             "pattern": r"==\s+|!=\s+",
             "type": "bug",
             "severity": "medium",
             "message": "Loose equality can cause unexpected behavior",
-            "suggestion": "Use === and !== for strict equality"
+            "suggestion": "Use === and !== for strict equality",
         },
         {
             "pattern": r"var\s+\w+",
             "type": "style",
             "severity": "low",
             "message": "Using var instead of let/const",
-            "suggestion": "Use let or const for block-scoped variables"
+            "suggestion": "Use let or const for block-scoped variables",
         },
         {
             "pattern": r"password\s*[=:]\s*['\"]",
             "type": "security",
             "severity": "high",
             "message": "Hardcoded password detected",
-            "suggestion": "Use environment variables"
+            "suggestion": "Use environment variables",
         },
         {
             "pattern": r"console\.log",
             "type": "style",
             "severity": "low",
             "message": "console.log left in code",
-            "suggestion": "Remove or use proper logging"
+            "suggestion": "Remove or use proper logging",
         },
-    ]
+    ],
 }
 
 
@@ -192,18 +192,16 @@ def _detect_language(path: Path) -> str:
 
 
 async def analyze_code(
-    path: str,
-    checks: list[str] | None = None,
-    ctx: Context | None = None
+    path: str, checks: list[str] | None = None, ctx: Context | None = None
 ) -> dict[str, Any]:
     """
     Analyze code for patterns, complexity, and potential issues.
-    
+
     Args:
         path: Path to file or directory
         checks: Analysis checks to run (complexity, style, security)
         ctx: MCP context
-        
+
     Returns:
         Analysis results
     """
@@ -215,28 +213,26 @@ async def analyze_code(
     if not file_path.exists():
         return {"error": f"Path not found: {path}"}
 
-    results = {
-        "path": path,
-        "checks": checks,
-        "issues": [],
-        "metrics": {},
-        "summary": {}
-    }
+    results = {"path": path, "checks": checks, "issues": [], "metrics": {}, "summary": {}}
 
     if file_path.is_file():
         files = [file_path]
     else:
         # Get all code files in directory
-        files = list(file_path.rglob("*.py")) + list(file_path.rglob("*.js")) + list(file_path.rglob("*.ts"))
+        files = (
+            list(file_path.rglob("*.py"))
+            + list(file_path.rglob("*.js"))
+            + list(file_path.rglob("*.ts"))
+        )
 
     all_issues = []
     all_metrics = []
 
     for f in files[:20]:  # Limit to 20 files
-        language = _detect_language(f)
+        _detect_language(f)
 
         async with aiofiles.open(f, encoding="utf-8", errors="replace") as file:
-            content = await file.read()
+            await file.read()
 
         # Run complexity analysis
         if "complexity" in checks:
@@ -247,9 +243,7 @@ async def analyze_code(
         # Run bug/security/style checks
         if "security" in checks or "style" in checks:
             issues = await find_bugs(
-                str(f),
-                severity="all" if "style" in checks else "high",
-                ctx=ctx
+                str(f), severity="all" if "style" in checks else "high", ctx=ctx
             )
             if "issues" in issues:
                 all_issues.extend(issues["issues"])
@@ -265,26 +259,25 @@ async def analyze_code(
         "low_severity": sum(1 for i in all_issues if i.get("severity") == "low"),
         "avg_complexity": (
             sum(m.get("cyclomatic", 0) for m in all_metrics) / len(all_metrics)
-            if all_metrics else 0
-        )
+            if all_metrics
+            else 0
+        ),
     }
 
     return results
 
 
 async def find_bugs(
-    path: str,
-    severity: Literal["all", "high", "medium", "low"] = "all",
-    ctx: Context | None = None
+    path: str, severity: Literal["all", "high", "medium", "low"] = "all", ctx: Context | None = None
 ) -> dict[str, Any]:
     """
     Find potential bugs and security issues in code.
-    
+
     Args:
         path: Path to file
         severity: Filter by severity level
         ctx: MCP context
-        
+
     Returns:
         List of potential issues
     """
@@ -319,7 +312,7 @@ async def find_bugs(
                     file=str(file_path),
                     line=i,
                     code=line.strip(),
-                    suggestion=pattern_info.get("suggestion", "")
+                    suggestion=pattern_info.get("suggestion", ""),
                 )
                 issues.append(issue.to_dict())
 
@@ -331,25 +324,22 @@ async def find_bugs(
         "by_severity": {
             "high": sum(1 for i in issues if i["severity"] == "high"),
             "medium": sum(1 for i in issues if i["severity"] == "medium"),
-            "low": sum(1 for i in issues if i["severity"] == "low")
-        }
+            "low": sum(1 for i in issues if i["severity"] == "low"),
+        },
     }
 
 
-async def get_complexity(
-    path: str,
-    ctx: Context | None = None
-) -> dict[str, Any]:
+async def get_complexity(path: str, ctx: Context | None = None) -> dict[str, Any]:
     """
     Calculate cyclomatic complexity and other metrics.
-    
+
     Cyclomatic complexity measures the number of linearly independent
     paths through a program's source code.
-    
+
     Args:
         path: Path to file
         ctx: MCP context
-        
+
     Returns:
         Complexity metrics
     """
@@ -380,26 +370,29 @@ async def get_complexity(
     # Calculate maintainability index (simplified)
     # MI = 171 - 5.2 * ln(V) - 0.23 * G - 16.2 * ln(LOC)
     import math
+
     volume = max(1, metrics.lines_of_code * 10)  # Simplified Halstead volume
-    metrics.maintainability_index = max(0, min(100,
-        171 - 5.2 * math.log(volume) -
-        0.23 * metrics.cyclomatic_complexity -
-        16.2 * math.log(max(1, metrics.lines_of_code))
-    ))
+    metrics.maintainability_index = max(
+        0,
+        min(
+            100,
+            171
+            - 5.2 * math.log(volume)
+            - 0.23 * metrics.cyclomatic_complexity
+            - 16.2 * math.log(max(1, metrics.lines_of_code)),
+        ),
+    )
 
     return {
         "path": path,
         "language": language,
         "metrics": metrics.to_dict(),
-        "rating": _complexity_rating(metrics.cyclomatic_complexity)
+        "rating": _complexity_rating(metrics.cyclomatic_complexity),
     }
 
 
 def _analyze_python_complexity(tree: ast.AST, metrics: ComplexityMetrics) -> ComplexityMetrics:
     """Analyze Python AST for complexity metrics."""
-    complexity = 1  # Base complexity
-    max_depth = 0
-    current_depth = 0
 
     class ComplexityVisitor(ast.NodeVisitor):
         def __init__(self):
@@ -466,11 +459,18 @@ def _analyze_complexity_regex(content: str, metrics: ComplexityMetrics) -> Compl
     """Regex-based complexity analysis for any language."""
     # Count decision points
     decision_patterns = [
-        r'\bif\b', r'\belse\b', r'\belif\b',
-        r'\bfor\b', r'\bwhile\b',
-        r'\band\b', r'\bor\b',
-        r'\btry\b', r'\bcatch\b', r'\bexcept\b',
-        r'\bcase\b', r'\?.*:',  # Ternary
+        r"\bif\b",
+        r"\belse\b",
+        r"\belif\b",
+        r"\bfor\b",
+        r"\bwhile\b",
+        r"\band\b",
+        r"\bor\b",
+        r"\btry\b",
+        r"\bcatch\b",
+        r"\bexcept\b",
+        r"\bcase\b",
+        r"\?.*:",  # Ternary
     ]
 
     complexity = 1
@@ -478,11 +478,11 @@ def _analyze_complexity_regex(content: str, metrics: ComplexityMetrics) -> Compl
         complexity += len(re.findall(pattern, content))
 
     # Count functions/classes
-    metrics.functions = len(re.findall(r'\bdef\s+\w+|\bfunction\s+\w+|=>\s*{', content))
-    metrics.classes = len(re.findall(r'\bclass\s+\w+', content))
+    metrics.functions = len(re.findall(r"\bdef\s+\w+|\bfunction\s+\w+|=>\s*{", content))
+    metrics.classes = len(re.findall(r"\bclass\s+\w+", content))
 
     # Estimate nesting (count indentation levels)
-    lines = content.split('\n')
+    lines = content.split("\n")
     max_indent = 0
     for line in lines:
         if line.strip():

@@ -19,6 +19,7 @@ from typing import Any
 @dataclass
 class ProjectInfo:
     """Information about a project."""
+
     name: str
     type: str  # python, node, rust, go, etc.
     root_path: str
@@ -35,6 +36,7 @@ class ProjectInfo:
 @dataclass
 class WorkspaceSummary:
     """Summarized workspace information."""
+
     total_files: int
     total_lines: int
     languages: dict[str, int]  # language -> file count
@@ -48,6 +50,7 @@ class WorkspaceSummary:
 @dataclass
 class DependencyMap:
     """Dependency analysis result."""
+
     direct: list[dict[str, str]]
     dev: list[dict[str, str]]
     total_count: int
@@ -59,6 +62,7 @@ class DependencyMap:
 @dataclass
 class CodeHealthMetrics:
     """Code health and quality metrics."""
+
     files_analyzed: int
     total_lines: int
     code_lines: int
@@ -76,7 +80,11 @@ class CodeHealthMetrics:
 PROJECT_PATTERNS = {
     "python": {
         "markers": ["pyproject.toml", "setup.py", "requirements.txt", "Pipfile"],
-        "package_managers": {"pyproject.toml": "uv/pip", "Pipfile": "pipenv", "requirements.txt": "pip"},
+        "package_managers": {
+            "pyproject.toml": "uv/pip",
+            "Pipfile": "pipenv",
+            "requirements.txt": "pip",
+        },
         "entry_points": ["main.py", "app.py", "__main__.py", "cli.py"],
         "extensions": [".py", ".pyi"],
     },
@@ -102,26 +110,45 @@ PROJECT_PATTERNS = {
 
 # Ignored directories
 IGNORED_DIRS = {
-    "node_modules", ".git", "__pycache__", ".venv", "venv",
-    "dist", "build", ".next", ".nuxt", "target", ".cache",
-    ".pytest_cache", ".mypy_cache", "coverage", ".tox"
+    "node_modules",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+    ".next",
+    ".nuxt",
+    "target",
+    ".cache",
+    ".pytest_cache",
+    ".mypy_cache",
+    "coverage",
+    ".tox",
 }
 
 # Ignored files
 IGNORED_FILES = {
-    ".DS_Store", "Thumbs.db", ".gitignore", ".env",
-    "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
-    "poetry.lock", "Cargo.lock", "go.sum"
+    ".DS_Store",
+    "Thumbs.db",
+    ".gitignore",
+    ".env",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "Cargo.lock",
+    "go.sum",
 }
 
 
 async def detect_project_type(root_path: str) -> ProjectInfo:
     """
     Detect project type and gather information.
-    
+
     Args:
         root_path: Path to project root
-    
+
     Returns:
         ProjectInfo with detected information
     """
@@ -139,7 +166,7 @@ async def detect_project_type(root_path: str) -> ProjectInfo:
             config_files=[],
             dependencies={},
             dev_dependencies={},
-            scripts={}
+            scripts={},
         )
 
     # Detect project type
@@ -206,7 +233,7 @@ async def detect_project_type(root_path: str) -> ProjectInfo:
         config_files=config_files,
         dependencies=dependencies,
         dev_dependencies=dev_dependencies,
-        scripts=scripts
+        scripts=scripts,
     )
 
 
@@ -214,6 +241,7 @@ def _parse_pyproject(path: Path) -> dict:
     """Parse pyproject.toml for project info."""
     try:
         import tomllib
+
         with open(path, "rb") as f:
             data = tomllib.load(f)
 
@@ -228,7 +256,7 @@ def _parse_pyproject(path: Path) -> dict:
         return {
             "name": project.get("name", ""),
             "dependencies": dependencies,
-            "dev_dependencies": {}
+            "dev_dependencies": {},
         }
     except Exception:
         return {}
@@ -242,7 +270,7 @@ def _parse_package_json(path: Path) -> dict:
             "name": data.get("name", ""),
             "dependencies": data.get("dependencies", {}),
             "dev_dependencies": data.get("devDependencies", {}),
-            "scripts": data.get("scripts", {})
+            "scripts": data.get("scripts", {}),
         }
     except Exception:
         return {}
@@ -286,20 +314,18 @@ def _detect_node_framework(deps: dict) -> str | None:
 
 
 async def get_workspace_summary(
-    root_path: str,
-    max_depth: int = 4,
-    include_content_preview: bool = False
+    root_path: str, max_depth: int = 4, include_content_preview: bool = False
 ) -> WorkspaceSummary:
     """
     Generate a comprehensive workspace summary.
-    
+
     Token-optimized summary of the entire workspace.
-    
+
     Args:
         root_path: Path to workspace root
         max_depth: Maximum directory depth to traverse
         include_content_preview: Include file content previews
-    
+
     Returns:
         WorkspaceSummary with key information
     """
@@ -313,11 +339,21 @@ async def get_workspace_summary(
 
     # Key file patterns
     key_patterns = [
-        "README.md", "readme.md", "README",
-        "main.py", "app.py", "index.js", "index.ts",
-        "package.json", "pyproject.toml", "Cargo.toml",
-        "Dockerfile", "docker-compose.yml",
-        ".env.example", "config.py", "settings.py"
+        "README.md",
+        "readme.md",
+        "README",
+        "main.py",
+        "app.py",
+        "index.js",
+        "index.ts",
+        "package.json",
+        "pyproject.toml",
+        "Cargo.toml",
+        "Dockerfile",
+        "docker-compose.yml",
+        ".env.example",
+        "config.py",
+        "settings.py",
     ]
 
     # Walk directory
@@ -385,7 +421,7 @@ async def get_workspace_summary(
         key_files=key_files[:20],  # Limit to top 20
         entry_points=entry_points,
         token_estimate=token_estimate,
-        summary_text=summary_text
+        summary_text=summary_text,
     )
 
 
@@ -450,10 +486,10 @@ def _build_structure_tree(root: Path, max_depth: int = 2) -> dict:
 async def analyze_dependencies(root_path: str) -> DependencyMap:
     """
     Analyze project dependencies.
-    
+
     Args:
         root_path: Path to project root
-    
+
     Returns:
         DependencyMap with dependency analysis
     """
@@ -471,17 +507,17 @@ async def analyze_dependencies(root_path: str) -> DependencyMap:
         total_count=len(direct) + len(dev),
         outdated=[],  # Would need network call to check
         security_issues=[],  # Would need security database
-        dependency_tree=dependency_tree
+        dependency_tree=dependency_tree,
     )
 
 
 async def get_code_health(root_path: str) -> CodeHealthMetrics:
     """
     Analyze code health metrics.
-    
+
     Args:
         root_path: Path to project root
-    
+
     Returns:
         CodeHealthMetrics with quality indicators
     """
@@ -519,7 +555,11 @@ async def get_code_health(root_path: str) -> CodeHealthMetrics:
                     stripped = line.strip()
                     if not stripped:
                         blank_lines += 1
-                    elif stripped.startswith("#") or stripped.startswith("//") or stripped.startswith("/*"):
+                    elif (
+                        stripped.startswith("#")
+                        or stripped.startswith("//")
+                        or stripped.startswith("/*")
+                    ):
                         comment_lines += 1
                     else:
                         code_lines += 1
@@ -544,10 +584,14 @@ async def get_code_health(root_path: str) -> CodeHealthMetrics:
         recommendations.append("📚 High comment ratio. Some comments may be redundant.")
 
     if avg_file_size > 500:
-        recommendations.append("📦 Large average file size. Consider splitting into smaller modules.")
+        recommendations.append(
+            "📦 Large average file size. Consider splitting into smaller modules."
+        )
 
     if largest_files and largest_files[0]["lines"] > 1000:
-        recommendations.append(f"⚠️ {largest_files[0]['file']} is very large ({largest_files[0]['lines']} lines). Consider refactoring.")
+        recommendations.append(
+            f"⚠️ {largest_files[0]['file']} is very large ({largest_files[0]['lines']} lines). Consider refactoring."
+        )
 
     if files_analyzed < 5:
         recommendations.append("📊 Small codebase. Metrics may not be representative.")
@@ -563,26 +607,24 @@ async def get_code_health(root_path: str) -> CodeHealthMetrics:
         largest_files=largest_files,
         complexity_hotspots=[],  # Would need AST analysis
         duplication_estimate=0.0,  # Would need duplicate detection
-        recommendations=recommendations
+        recommendations=recommendations,
     )
 
 
 async def extract_smart_context(
-    root_path: str,
-    query: str,
-    max_tokens: int = 4000
+    root_path: str, query: str, max_tokens: int = 4000
 ) -> dict[str, Any]:
     """
     Extract the most relevant context for a query.
-    
+
     Intelligently selects files and sections most relevant
     to the user's query, optimized for token budget.
-    
+
     Args:
         root_path: Path to project root
         query: User's query or task description
         max_tokens: Maximum tokens to include
-    
+
     Returns:
         Optimized context for the query
     """
@@ -594,11 +636,13 @@ async def extract_smart_context(
     tokens_used = 0
 
     # Always include project summary (low token cost, high value)
-    context_parts.append({
-        "type": "summary",
-        "content": summary.summary_text,
-        "tokens": len(summary.summary_text) // 4
-    })
+    context_parts.append(
+        {
+            "type": "summary",
+            "content": summary.summary_text,
+            "tokens": len(summary.summary_text) // 4,
+        }
+    )
     tokens_used += len(summary.summary_text) // 4
 
     # Extract keywords from query
@@ -631,13 +675,15 @@ async def extract_smart_context(
             if remaining > 200:  # Worth including partial
                 try:
                     content = (root / file_path).read_text(errors="replace")
-                    truncated = content[:remaining * 4]  # Approximate char limit
-                    included_files.append({
-                        "file": file_path,
-                        "content": truncated + "\n... (truncated)",
-                        "relevance": round(score, 2),
-                        "truncated": True
-                    })
+                    truncated = content[: remaining * 4]  # Approximate char limit
+                    included_files.append(
+                        {
+                            "file": file_path,
+                            "content": truncated + "\n... (truncated)",
+                            "relevance": round(score, 2),
+                            "truncated": True,
+                        }
+                    )
                     tokens_used += remaining
                 except Exception:
                     pass
@@ -645,26 +691,24 @@ async def extract_smart_context(
 
         try:
             content = (root / file_path).read_text(errors="replace")
-            included_files.append({
-                "file": file_path,
-                "content": content,
-                "relevance": round(score, 2),
-                "truncated": False
-            })
+            included_files.append(
+                {
+                    "file": file_path,
+                    "content": content,
+                    "relevance": round(score, 2),
+                    "truncated": False,
+                }
+            )
             tokens_used += size
         except Exception:
             pass
 
     return {
-        "project": {
-            "name": project.name,
-            "type": project.type,
-            "framework": project.framework
-        },
+        "project": {"name": project.name, "type": project.type, "framework": project.framework},
         "summary": summary.summary_text,
         "files": included_files,
         "tokens_used": tokens_used,
-        "token_budget": max_tokens
+        "token_budget": max_tokens,
     }
 
 
@@ -672,16 +716,66 @@ def _extract_keywords(text: str) -> list[str]:
     """Extract meaningful keywords from text."""
     # Remove common words
     stop_words = {
-        "the", "a", "an", "is", "are", "was", "were", "be", "been",
-        "being", "have", "has", "had", "do", "does", "did", "will",
-        "would", "could", "should", "may", "might", "must", "can",
-        "this", "that", "these", "those", "i", "you", "he", "she",
-        "it", "we", "they", "what", "which", "who", "whom", "how",
-        "when", "where", "why", "and", "or", "but", "if", "then",
-        "else", "for", "to", "from", "with", "by", "at", "in", "on"
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "can",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "you",
+        "he",
+        "she",
+        "it",
+        "we",
+        "they",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "how",
+        "when",
+        "where",
+        "why",
+        "and",
+        "or",
+        "but",
+        "if",
+        "then",
+        "else",
+        "for",
+        "to",
+        "from",
+        "with",
+        "by",
+        "at",
+        "in",
+        "on",
     }
 
-    words = re.findall(r'\b\w+\b', text)
+    words = re.findall(r"\b\w+\b", text)
     return [w for w in words if w not in stop_words and len(w) > 2]
 
 

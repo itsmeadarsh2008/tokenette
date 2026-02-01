@@ -38,14 +38,14 @@ class AmplificationResult:
 class QualityAmplifier:
     """
     Makes cheaper models produce premium-quality output.
-    
+
     Applies enhancement techniques before the prompt hits the model:
     - Role framing: "You are a senior software engineer..."
     - Chain of thought: "Think step by step..."
     - Few-shot examples: Show examples of desired output
     - Structured output: Enforce consistent response format
     - Tradeoff analysis: Consider alternatives before deciding
-    
+
     Example:
         >>> amplifier = QualityAmplifier()
         >>> result = amplifier.amplify(
@@ -104,7 +104,7 @@ class QualityAmplifier:
         TaskCategory.COMPLETION: (
             "Complete the code naturally, matching the existing style exactly. "
             "Maintain consistency with the surrounding codebase."
-        )
+        ),
     }
 
     # Structured output template
@@ -167,7 +167,7 @@ Then proceed with the best approach.
             "Approach: Add eager loading with proper indices\n"
             "Result: Query time reduced from 2.3s to 45ms\n"
             "---"
-        )
+        ),
     }
 
     # Step-by-step reasoning template
@@ -187,17 +187,17 @@ Work through this systematically:
         prompt: str,
         boosters: list[str],
         category: TaskCategory,
-        context: dict[str, Any] | None = None
+        context: dict[str, Any] | None = None,
     ) -> AmplificationResult:
         """
         Amplify a prompt with quality-enhancing techniques.
-        
+
         Args:
             prompt: Original user prompt
             boosters: List of boosters to apply
             category: Task category for appropriate framing
             context: Optional additional context
-            
+
         Returns:
             AmplificationResult with enhanced prompt
         """
@@ -242,17 +242,13 @@ Work through this systematically:
             prompt=enhanced,
             original_length=original_length,
             amplified_length=len(enhanced),
-            boosters_applied=applied
+            boosters_applied=applied,
         )
 
-    def get_validation_prompt(
-        self,
-        code: str,
-        category: TaskCategory
-    ) -> str:
+    def get_validation_prompt(self, code: str, category: TaskCategory) -> str:
         """
         Generate a validation prompt for post-processing.
-        
+
         This can be used to validate model output before returning.
         """
         validation_prompts = {
@@ -273,24 +269,19 @@ Work through this systematically:
                 "- Is it a pure refactoring (no behavior change)?\n"
                 "- Is it actually simpler/cleaner?\n"
                 "- Is it testable?\n"
-            )
+            ),
         }
 
         base_prompt = validation_prompts.get(
-            category,
-            "Review this code for correctness and best practices:\n"
+            category, "Review this code for correctness and best practices:\n"
         )
 
         return f"{base_prompt}\n```\n{code}\n```"
 
-    def estimate_quality_improvement(
-        self,
-        boosters: list[str],
-        base_quality: float
-    ) -> float:
+    def estimate_quality_improvement(self, boosters: list[str], base_quality: float) -> float:
         """
         Estimate quality improvement from boosters.
-        
+
         Each booster provides a multiplicative improvement.
         """
         improvement_factors = {
@@ -300,7 +291,7 @@ Work through this systematically:
             "tradeoff_analysis_prompt": 1.06,
             "few_shot_examples": 1.12,
             "structured_output_enforcement": 1.07,
-            "post_validation": 1.03
+            "post_validation": 1.03,
         }
 
         improved = base_quality

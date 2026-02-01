@@ -11,6 +11,7 @@ from enum import Enum
 
 class PromptCategory(Enum):
     """Categories of prompt templates."""
+
     CODE_GENERATION = "code_generation"
     REFACTORING = "refactoring"
     DEBUGGING = "debugging"
@@ -24,6 +25,7 @@ class PromptCategory(Enum):
 @dataclass
 class PromptTemplate:
     """A reusable prompt template."""
+
     name: str
     category: PromptCategory
     template: str
@@ -36,6 +38,7 @@ class PromptTemplate:
 @dataclass
 class BuiltPrompt:
     """A built prompt ready for use."""
+
     prompt: str
     template_name: str
     variables_used: dict[str, str]
@@ -61,9 +64,8 @@ Requirements:
 - Follow {language} best practices""",
         description="Generate a well-structured function",
         variables=["language", "name", "purpose", "params", "returns"],
-        token_estimate=80
+        token_estimate=80,
     ),
-
     "class": PromptTemplate(
         name="class",
         category=PromptCategory.CODE_GENERATION,
@@ -78,9 +80,8 @@ Requirements:
 - Include docstrings/comments""",
         description="Generate a well-designed class",
         variables=["language", "name", "purpose", "methods", "properties"],
-        token_estimate=90
+        token_estimate=90,
     ),
-
     "api_endpoint": PromptTemplate(
         name="api_endpoint",
         category=PromptCategory.CODE_GENERATION,
@@ -96,9 +97,8 @@ Requirements:
 - Authentication/authorization if needed""",
         description="Generate a REST API endpoint",
         variables=["framework", "method", "path", "purpose", "request_body", "response"],
-        token_estimate=100
+        token_estimate=100,
     ),
-
     # Refactoring
     "refactor_function": PromptTemplate(
         name="refactor_function",
@@ -120,9 +120,8 @@ Constraints:
 Output the refactored code with brief explanation of changes.""",
         description="Refactor a function with specific goals",
         variables=["language", "code", "goals"],
-        token_estimate=120
+        token_estimate=120,
     ),
-
     "extract_method": PromptTemplate(
         name="extract_method",
         category=PromptCategory.REFACTORING,
@@ -143,9 +142,8 @@ Requirements:
 - Preserve all functionality""",
         description="Extract code into a separate method",
         variables=["language", "code", "lines", "method_name", "purpose"],
-        token_estimate=100
+        token_estimate=100,
     ),
-
     # Debugging
     "find_bug": PromptTemplate(
         name="find_bug",
@@ -167,9 +165,8 @@ Analyze step by step:
 4. Suggest how to prevent similar bugs""",
         description="Find and fix a bug with detailed analysis",
         variables=["language", "code", "symptoms", "expected", "actual"],
-        token_estimate=130
+        token_estimate=130,
     ),
-
     "trace_execution": PromptTemplate(
         name="trace_execution",
         category=PromptCategory.DEBUGGING,
@@ -187,9 +184,8 @@ Walk through line by line:
 - Point out any issues found""",
         description="Step-by-step execution trace",
         variables=["language", "code", "input"],
-        token_estimate=100
+        token_estimate=100,
     ),
-
     # Testing
     "unit_tests": PromptTemplate(
         name="unit_tests",
@@ -212,9 +208,8 @@ Requirements:
 - Independent, isolated tests""",
         description="Generate comprehensive unit tests",
         variables=["language", "code", "framework", "edge_cases", "error_cases"],
-        token_estimate=140
+        token_estimate=140,
     ),
-
     "test_cases": PromptTemplate(
         name="test_cases",
         category=PromptCategory.TESTING,
@@ -224,15 +219,14 @@ Context: {context}
 
 Generate:
 1. 5 happy path test cases
-2. 5 edge case scenarios  
+2. 5 edge case scenarios
 3. 3 error/failure scenarios
 
 Format: | Test Name | Input | Expected Output | Type |""",
         description="Generate test case matrix",
         variables=["feature", "context"],
-        token_estimate=80
+        token_estimate=80,
     ),
-
     # Documentation
     "docstring": PromptTemplate(
         name="docstring",
@@ -252,9 +246,8 @@ Include:
 - Example usage""",
         description="Generate function/class documentation",
         variables=["language", "code", "style"],
-        token_estimate=90
+        token_estimate=90,
     ),
-
     "readme_section": PromptTemplate(
         name="readme_section",
         category=PromptCategory.DOCUMENTATION,
@@ -268,9 +261,8 @@ Include: {include}
 Format: Markdown with code examples""",
         description="Generate README documentation",
         variables=["section", "project_name", "context", "include"],
-        token_estimate=70
+        token_estimate=70,
     ),
-
     # Code Review
     "code_review": PromptTemplate(
         name="code_review",
@@ -293,9 +285,8 @@ Provide feedback on:
 Format: Severity (🔴Critical/🟡Warning/🔵Info) | Line | Issue | Suggestion""",
         description="Comprehensive code review",
         variables=["language", "code", "focus"],
-        token_estimate=150
+        token_estimate=150,
     ),
-
     "security_audit": PromptTemplate(
         name="security_audit",
         category=PromptCategory.REVIEW,
@@ -317,9 +308,8 @@ OWASP Top 10 focus: {owasp_focus}
 Format: Severity | CWE ID | Issue | Location | Remediation""",
         description="Security-focused code audit",
         variables=["language", "code", "owasp_focus"],
-        token_estimate=140
+        token_estimate=140,
     ),
-
     # Architecture
     "design_pattern": PromptTemplate(
         name="design_pattern",
@@ -336,9 +326,8 @@ Requirements:
 - Explain when to use this pattern""",
         description="Implement a design pattern",
         variables=["pattern", "language", "context", "classes"],
-        token_estimate=100
+        token_estimate=100,
     ),
-
     "system_design": PromptTemplate(
         name="system_design",
         category=PromptCategory.ARCHITECTURE,
@@ -358,9 +347,8 @@ Provide:
 6. Potential bottlenecks and mitigations""",
         description="System design document",
         variables=["requirement", "scale", "latency", "availability"],
-        token_estimate=160
+        token_estimate=160,
     ),
-
     # Optimization
     "optimize_performance": PromptTemplate(
         name="optimize_performance",
@@ -385,9 +373,8 @@ Provide optimized version with:
 - Tradeoffs explained""",
         description="Performance optimization",
         variables=["language", "code", "issues", "metric"],
-        token_estimate=140
+        token_estimate=140,
     ),
-
     "reduce_complexity": PromptTemplate(
         name="reduce_complexity",
         category=PromptCategory.OPTIMIZATION,
@@ -408,7 +395,7 @@ Techniques to consider:
 - Divide and conquer""",
         description="Reduce algorithmic complexity",
         variables=["language", "code", "current_complexity", "target_complexity"],
-        token_estimate=100
+        token_estimate=100,
     ),
 }
 
@@ -420,10 +407,7 @@ class PromptBuilder:
         self.templates = TEMPLATES.copy()
         self.custom_templates: dict[str, PromptTemplate] = {}
 
-    def list_templates(
-        self,
-        category: PromptCategory | None = None
-    ) -> list[dict[str, str]]:
+    def list_templates(self, category: PromptCategory | None = None) -> list[dict[str, str]]:
         """List available templates."""
         result = []
 
@@ -431,12 +415,14 @@ class PromptBuilder:
             if category and template.category != category:
                 continue
 
-            result.append({
-                "name": name,
-                "category": template.category.value,
-                "description": template.description,
-                "variables": template.variables
-            })
+            result.append(
+                {
+                    "name": name,
+                    "category": template.category.value,
+                    "description": template.description,
+                    "variables": template.variables,
+                }
+            )
 
         return result
 
@@ -448,16 +434,16 @@ class PromptBuilder:
         self,
         template_name: str,
         variables: dict[str, str],
-        quality_boosters: list[str] | None = None
+        quality_boosters: list[str] | None = None,
     ) -> BuiltPrompt:
         """
         Build a prompt from a template.
-        
+
         Args:
             template_name: Name of the template
             variables: Variable values to fill in
             quality_boosters: Optional boosters to prepend
-        
+
         Returns:
             BuiltPrompt ready for use
         """
@@ -484,7 +470,7 @@ class PromptBuilder:
             template_name=template_name,
             variables_used=variables,
             token_count=token_count,
-            quality_boosters=boosters
+            quality_boosters=boosters,
         )
 
     def _build_boosters(self, boosters: list[str]) -> str:
@@ -496,7 +482,7 @@ class PromptBuilder:
             "few_shot_examples": "Follow the examples provided closely.",
             "structured_output_enforcement": "Structure your response clearly with sections.",
             "tradeoff_analysis_prompt": "Consider tradeoffs and explain your choices.",
-            "post_validation": "Verify your solution is correct before presenting it."
+            "post_validation": "Verify your solution is correct before presenting it.",
         }
 
         return " ".join(booster_texts.get(b, "") for b in boosters if b in booster_texts)
@@ -507,7 +493,7 @@ class PromptBuilder:
         template: str,
         category: PromptCategory,
         description: str,
-        variables: list[str]
+        variables: list[str],
     ) -> PromptTemplate:
         """Add a custom template."""
         new_template = PromptTemplate(
@@ -516,7 +502,7 @@ class PromptBuilder:
             template=template,
             description=description,
             variables=variables,
-            token_estimate=len(template) // 4
+            token_estimate=len(template) // 4,
         )
         self.custom_templates[name] = new_template
         return new_template
@@ -535,9 +521,7 @@ def get_prompt_builder() -> PromptBuilder:
 
 
 def build_prompt(
-    template_name: str,
-    variables: dict[str, str],
-    quality_boosters: list[str] | None = None
+    template_name: str, variables: dict[str, str], quality_boosters: list[str] | None = None
 ) -> BuiltPrompt:
     """Convenience function to build a prompt."""
     return get_prompt_builder().build(template_name, variables, quality_boosters)

@@ -144,12 +144,12 @@ class ServerConfig(BaseModel):
 class TokenetteConfig(BaseSettings):
     """
     Main Tokenette configuration.
-    
+
     Configuration can be set via:
     1. Environment variables (TOKENETTE_*)
     2. .tokenette.json config file
     3. Direct instantiation
-    
+
     Example:
         >>> config = TokenetteConfig(
         ...     cache=CacheConfig(l1_max_size_mb=200),
@@ -172,6 +172,7 @@ class TokenetteConfig(BaseSettings):
     def from_file(cls, path: Path | str) -> TokenetteConfig:
         """Load configuration from a JSON file."""
         import json
+
         path = Path(path)
         if path.exists():
             with open(path) as f:
@@ -208,6 +209,7 @@ class TokenetteConfig(BaseSettings):
     def save(self, path: Path | str) -> None:
         """Save configuration to a JSON file."""
         import json
+
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
@@ -221,13 +223,13 @@ _config: TokenetteConfig | None = None
 def get_config() -> TokenetteConfig:
     """
     Get the global configuration instance.
-    
+
     Auto-discovers configuration from:
     1. .tokenette.json in current directory
-    2. .tokenette.json in home directory  
+    2. .tokenette.json in home directory
     3. Environment variables (TOKENETTE_*)
     4. Default values
-    
+
     Returns:
         TokenetteConfig: The configuration instance
     """
