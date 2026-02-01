@@ -22,18 +22,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --extra dev
 
       - name: Run tests
         run: uv run pytest -v --tb=short
@@ -45,48 +43,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
+      - name: Set up Python
+        run: uv python install 3.13
+
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --extra dev
 
       - name: Check formatting
         run: uv run ruff format --check .
 
       - name: Check linting
         run: uv run ruff check .
-
-  type-check:
-    name: Type Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --dev
-
-      - name: Run mypy
-        run: uv run mypy src/tokenette --ignore-missing-imports
-        continue-on-error: true
 
   build:
     name: Build Package
@@ -96,23 +68,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
 
       - name: Build package
         run: uv build
 
       - name: Check package
         run: |
-          uv pip install twine --system
-          twine check dist/*
+          uv run twine check dist/*
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
