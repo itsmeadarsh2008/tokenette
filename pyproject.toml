@@ -8,9 +8,7 @@ version = "2.0.0"
 description = "The Ultimate All-in-One AI Coding Enhancement MCP - Zero-Loss Token Optimization · Intelligent Model Routing · Quality Amplification"
 readme = "README.md"
 license = "MIT"
-authors = [
-    { name = "Adarsh", email = "e2vylu0d0@mozmail.com" }
-]
+authors = [{ name = "Adarsh Gourab Mahalik", email = "adarshgourabmahalik@outlook.com" }]
 keywords = [
     "mcp",
     "model-context-protocol",
