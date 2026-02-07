@@ -5,6 +5,19 @@ All notable changes to Tokenette will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-02-07
+
+### Added
+- **Interaction batching engine** with `tokenette_batch_ops` for multi-op payloads
+- **Metrics tracker** with optional persistence and CLI visibility
+- **Streaming reads** for huge files
+- **Optional vector similarity** for semantic cache/search (when `vector` extras installed)
+
+### Fixed
+- Cache stats/close methods and router budget alias mismatches
+- Server optimization result formatting and tool metrics updates
+- Meta tool discovery output now aligns with `tokenette_` tool names
+
 ## [2.0.0] - 2026-02-01
 
 ### Added
@@ -99,5 +112,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[2.0.1]: https://github.com/itsmeadarsh2008/tokenette/releases/tag/v2.0.1
 [2.0.0]: https://github.com/itsmeadarsh2008/tokenette/releases/tag/v2.0.0
 [1.0.0]: https://github.com/itsmeadarsh2008/tokenette/releases/tag/v1.0.0

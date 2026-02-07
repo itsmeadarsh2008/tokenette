@@ -20,8 +20,18 @@ from pathlib import Path
 from typing import Any, Literal
 
 import aiofiles
+
+try:
+    from sentence_transformers import SentenceTransformer, util as st_util
+
+    HAS_VECTOR = True
+except Exception:
+    SentenceTransformer = None  # type: ignore[assignment]
+    st_util = None  # type: ignore[assignment]
+    HAS_VECTOR = False
 from fastmcp import Context
 
+from tokenette.config import get_config
 from tokenette.core.minifier import MinificationEngine
 
 
@@ -87,6 +97,18 @@ STRATEGY_THRESHOLDS = {
     # > 500KB: stream or reject
 }
 
+STREAM_CHUNK_SIZE = 20_000  # chars per chunk
+_VECTOR_MODEL: SentenceTransformer | None = None
+
+
+def _get_vector_model() -> SentenceTransformer | None:
+    global _VECTOR_MODEL
+    if not HAS_VECTOR:
+        return None
+    if _VECTOR_MODEL is None:
+        _VECTOR_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+    return _VECTOR_MODEL
+
 
 async def read_file_smart(
     path: str,
@@ -126,9 +148,25 @@ async def read_file_smart(
     if not file_path.exists():
         return {"error": f"File not found: {path}"}
 
+    config = get_config()
+
     # Get file info
     file_size = file_path.stat().st_size
     file_hash = await _compute_file_hash(file_path)
+
+    cache = None
+    if ctx is not None and hasattr(ctx, "state"):
+        cache = ctx.state.get("cache")
+
+    cache_key = f"file:{path}:{file_hash}:{strategy}:{start_line}:{end_line}"
+    if cache is not None:
+        cached = await cache.get(cache_key)
+        if cached and cached.hit:
+            cached_payload = cached.data
+            if isinstance(cached_payload, dict):
+                cached_payload["from_cache"] = True
+                cached_payload["cache_layer"] = cached.layer
+            return cached_payload
 
     # Log if context available
     if ctx:
@@ -147,7 +185,14 @@ async def read_file_smart(
 
     # Execute strategy
     if strategy == "full":
-        content = await _read_full(file_path)
+        if (
+            config.compression.stream_large_responses
+            and file_size > STRATEGY_THRESHOLDS["summary"]
+        ):
+            content = await _read_stream(file_path)
+            strategy = "stream"
+        else:
+            content = await _read_full(file_path)
     elif strategy == "partial":
         content = await _read_partial(file_path, start_line, end_line)
     elif strategy == "summary":
@@ -161,7 +206,7 @@ async def read_file_smart(
     # Calculate result size
     result_size = len(str(content)) if isinstance(content, dict) else len(content)
 
-    return {
+    result = {
         "path": path,
         "content": content,
         "strategy": strategy,
@@ -172,6 +217,11 @@ async def read_file_smart(
         "file_hash": file_hash,
         "_format": "code" if isinstance(content, str) else "json",
     }
+
+    if cache is not None:
+        await cache.set(cache_key, result)
+
+    return result
 
 
 async def _compute_file_hash(path: Path) -> str:
@@ -191,6 +241,25 @@ async def _read_full(path: Path) -> str:
     result = minifier.minify(content, content_type="auto")
 
     return result.data
+
+
+async def _read_stream(path: Path, chunk_size: int = STREAM_CHUNK_SIZE) -> dict[str, Any]:
+    """Read a large file in chunks for streaming responses."""
+    async with aiofiles.open(path, encoding="utf-8", errors="replace") as f:
+        content = await f.read()
+
+    chunks = [
+        content[i : i + chunk_size] for i in range(0, len(content), chunk_size) if content
+    ]
+
+    return {
+        "stream": True,
+        "chunk_size": chunk_size,
+        "total_chunks": len(chunks),
+        "chunks": [
+            {"index": idx, "content": chunk} for idx, chunk in enumerate(chunks, start=1)
+        ],
+    }
 
 
 async def _read_partial(
@@ -371,7 +440,11 @@ def _extract_key_lines(content: str) -> list[str]:
 
 
 async def write_file_diff(
-    path: str, changes: str, verify: bool = True, ctx: Context | None = None
+    path: str,
+    changes: str,
+    verify: bool = True,
+    ctx: Context | None = None,
+    expected_hash: str | None = None,
 ) -> dict[str, Any]:
     """
     Write file changes using unified diff format.
@@ -397,6 +470,22 @@ async def write_file_diff(
     async with aiofiles.open(file_path, encoding="utf-8") as f:
         original_content = await f.read()
 
+    current_hash = hashlib.sha256(original_content.encode()).hexdigest()[:16]
+
+    # Optional hash verification (can be embedded in diff as tokenette-hash)
+    if expected_hash is None:
+        match = re.search(r"tokenette-hash:\s*([0-9a-fA-F]{8,64})", changes)
+        if match:
+            expected_hash = match.group(1)[:16]
+
+    if verify and expected_hash and expected_hash != current_hash:
+        return {
+            "error": "Hash mismatch - file changed since last read",
+            "path": path,
+            "expected_hash": expected_hash,
+            "current_hash": current_hash,
+        }
+
     original_lines = original_content.split("\n")
 
     # Parse and apply diff
@@ -413,6 +502,12 @@ async def write_file_diff(
     # Compute new hash
     new_hash = hashlib.sha256(new_content.encode()).hexdigest()[:16]
 
+    # Invalidate cached reads for this file
+    if ctx is not None and hasattr(ctx, "state"):
+        cache = ctx.state.get("cache")
+        if cache is not None:
+            cache.invalidate(f"file:{path}")
+
     if ctx:
         await ctx.info(f"Applied changes to {path}")
 
@@ -420,11 +515,12 @@ async def write_file_diff(
         "status": "success",
         "path": path,
         "lines_changed": abs(len(new_lines) - len(original_lines)),
+        "original_hash": current_hash,
         "new_hash": new_hash,
         "original_size": len(original_content),
         "new_size": len(new_content),
         "tokens_used": len(changes) // 4,
-        "tokens_saved": (len(new_content) - len(changes)) // 4,
+        "tokens_saved": max(0, (len(new_content) - len(changes)) // 4),
     }
 
 
@@ -517,21 +613,20 @@ async def search_code_semantic(
 
     results = []
 
-    # Walk directory
+    # Gather candidate files first (for optional vector scoring)
+    candidate_files: list[Path] = []
     for root, dirs, files in os.walk(dir_path):
-        # Skip common non-code directories
         dirs[:] = [
             d
             for d in dirs
-            if d not in {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+            if d
+            not in {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
         ]
 
         for file in files:
-            # Apply file pattern
             if file_pattern and not fnmatch.fnmatch(file, file_pattern):
                 continue
 
-            # Skip non-code files
             if not any(
                 file.endswith(ext)
                 for ext in [
@@ -549,41 +644,60 @@ async def search_code_semantic(
             ):
                 continue
 
-            file_path = Path(root) / file
+            candidate_files.append(Path(root) / file)
 
-            try:
-                async with aiofiles.open(file_path, encoding="utf-8", errors="replace") as f:
-                    content = await f.read()
-            except Exception:
-                continue
+    vector_model = _get_vector_model()
+    use_vector = vector_model is not None and len(candidate_files) <= 200
+    query_embedding = None
+    if use_vector:
+        query_embedding = vector_model.encode(query, normalize_embeddings=True)
 
-            # Score file
-            score = 0
-            matching_lines = []
+    for file_path in candidate_files:
+        try:
+            async with aiofiles.open(file_path, encoding="utf-8", errors="replace") as f:
+                content = await f.read()
+        except Exception:
+            continue
 
-            lines = content.split("\n")
-            for i, line in enumerate(lines, 1):
-                line_lower = line.lower()
-                line_score = sum(2 if kw in line_lower else 0 for kw in keywords)
+        # Keyword scoring
+        score = 0
+        matching_lines = []
 
-                if line_score > 0:
-                    score += line_score
-                    matching_lines.append(
-                        {"line": i, "content": line.strip()[:100], "score": line_score}
-                    )
+        lines = content.split("\n")
+        for i, line in enumerate(lines, 1):
+            line_lower = line.lower()
+            line_score = sum(2 if kw in line_lower else 0 for kw in keywords)
 
-            if score > 0:
-                # Sort matching lines by score
-                matching_lines.sort(key=lambda x: x["score"], reverse=True)
-
-                results.append(
-                    {
-                        "path": str(file_path.relative_to(dir_path)),
-                        "score": score,
-                        "matches": matching_lines[:5],  # Top 5 matches
-                        "total_matches": len(matching_lines),
-                    }
+            if line_score > 0:
+                score += line_score
+                matching_lines.append(
+                    {"line": i, "content": line.strip()[:100], "score": line_score}
                 )
+
+        # Vector scoring (optional)
+        vector_score = 0.0
+        if use_vector and query_embedding is not None:
+            sample = "\n".join(lines[:200]) if lines else content[:2000]
+            try:
+                doc_embedding = vector_model.encode(sample, normalize_embeddings=True)
+                vector_score = float(st_util.cos_sim(query_embedding, doc_embedding)[0][0])
+            except Exception:
+                vector_score = 0.0
+
+            score += int(vector_score * 10)
+
+        if score > 0:
+            matching_lines.sort(key=lambda x: x["score"], reverse=True)
+
+            results.append(
+                {
+                    "path": str(file_path.relative_to(dir_path)),
+                    "score": score,
+                    "vector_score": round(vector_score, 3) if use_vector else None,
+                    "matches": matching_lines[:5],
+                    "total_matches": len(matching_lines),
+                }
+            )
 
     # Sort by score
     results.sort(key=lambda x: x["score"], reverse=True)
@@ -596,6 +710,7 @@ async def search_code_semantic(
         "keywords": list(keywords),
         "results": results,
         "total_matches": len(results),
+        "vector_enabled": bool(use_vector),
         "_format": "json",
     }
 

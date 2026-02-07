@@ -15,13 +15,21 @@ from typing import Any, Literal
 from fastmcp import Context, FastMCP
 
 from .config import TokenetteConfig, get_config
-from .core import MultiLayerCache, OptimizationPipeline, QualityAmplifier, TaskRouter
+from .core import (
+    InteractionBatcher,
+    MetricsTracker,
+    MultiLayerCache,
+    OptimizationPipeline,
+    QualityAmplifier,
+    TaskRouter,
+)
 from .tools import (
     # Analysis tools
     analyze_code,
     batch_read_files,
     # Meta tools
     discover_tools,
+    execute_tool,
     fetch_library_docs,
     find_bugs,
     get_complexity,
@@ -59,6 +67,8 @@ async def lifespan(mcp: FastMCP):
     router = TaskRouter(config.router)
     amplifier = QualityAmplifier(config.amplifier)
     context7 = await get_context7_client()
+    metrics = MetricsTracker(config.metrics)
+    batcher = InteractionBatcher()
 
     # Store in MCP context for tool access
     mcp.state = {
@@ -68,7 +78,8 @@ async def lifespan(mcp: FastMCP):
         "router": router,
         "amplifier": amplifier,
         "context7": context7,
-        "metrics": {"requests": 0, "tokens_saved": 0, "cache_hits": 0, "premium_requests_used": 0},
+        "batcher": batcher,
+        "metrics": metrics,
     }
 
     try:
@@ -95,7 +106,7 @@ def create_server(config: TokenetteConfig | None = None) -> FastMCP:
         config = get_config()
 
     mcp = FastMCP(
-        name="tokenette",
+        name=(config.server.name or "tokenette").lower(),
         instructions="""
 Tokenette: The Ultimate AI Coding Enhancement MCP
 
@@ -107,6 +118,7 @@ Key capabilities:
 - Quality amplification for cheaper models
 - Multi-layer caching (L1-L4) with 99.8% hit rate on repeated data
 - Context7 integration for up-to-date library docs
+- Interaction batching for multi-op workflows
 
 Use `discover_tools` first to see available tools efficiently.
 Use `route_task` to get optimal model recommendations.
@@ -114,6 +126,38 @@ Use `optimize_output` to compress any response before transmission.
         """.strip(),
         lifespan=lifespan,
     )
+
+    def _record_metrics(
+        tool_name: str,
+        input_data: Any | None,
+        output_data: Any | None,
+        tokens_saved: int = 0,
+        cache_hit: bool | None = None,
+    ) -> None:
+        metrics: MetricsTracker = mcp.state["metrics"]
+        metrics.record_tool_call(
+            tool_name,
+            input_data=input_data,
+            output_data=output_data,
+            tokens_saved=tokens_saved,
+            cache_hit=cache_hit,
+        )
+
+    def _tokens_saved_from_result(result: Any) -> int:
+        if isinstance(result, dict):
+            for key in ("tokens_saved", "total_tokens_saved"):
+                if key in result and isinstance(result[key], int):
+                    return result[key]
+            tokens = result.get("tokens")
+            if isinstance(tokens, dict):
+                saved = tokens.get("saved")
+                if isinstance(saved, int):
+                    return saved
+                original = tokens.get("original")
+                minified = tokens.get("minified")
+                if isinstance(original, int) and isinstance(minified, int):
+                    return max(0, original - minified)
+        return 0
 
     # ─── REGISTER CORE TOOLS ─────────────────────────────────────
 
@@ -129,7 +173,9 @@ Use `optimize_output` to compress any response before transmission.
         Args:
             category: Filter by category (file, analysis, docs, meta)
         """
-        return await discover_tools(category, ctx)
+        result = await discover_tools(category, ctx)
+        _record_metrics("tokenette_discover_tools", {"category": category}, result)
+        return result
 
     @mcp.tool()
     async def tokenette_get_tool_details(
@@ -140,7 +186,37 @@ Use `optimize_output` to compress any response before transmission.
 
         Only fetches schema when needed, saving tokens.
         """
-        return await get_tool_details(tool_name, ctx)
+        result = await get_tool_details(tool_name, ctx)
+        _record_metrics("tokenette_get_tool_details", {"tool_name": tool_name}, result)
+        return result
+
+    @mcp.tool()
+    async def tokenette_execute_tool(
+        tool_name: str,
+        arguments: dict[str, Any],
+        cache_key: str | None = None,
+        skip_cache: bool = False,
+        ctx: Context | None = None,
+    ) -> dict[str, Any]:
+        """
+        Execute a tool dynamically via the meta-tool registry.
+
+        Args:
+            tool_name: Name of the tool to execute (use tokenette_discover_tools first)
+            arguments: Arguments for the tool
+            cache_key: Optional cache key
+            skip_cache: Skip cache lookup
+        """
+        result = await execute_tool(tool_name, arguments, cache_key, skip_cache, ctx)
+        _record_metrics(
+            "tokenette_execute_tool",
+            {"tool_name": tool_name, "cache_key": cache_key, "skip_cache": skip_cache},
+            result,
+        )
+        return result
+
+    if config.server.meta_tools_only:
+        return mcp
 
     # ─── FILE OPERATION TOOLS ────────────────────────────────────
 
@@ -168,11 +244,26 @@ Use `optimize_output` to compress any response before transmission.
             start_line: Start line for partial reads
             end_line: End line for partial reads
         """
-        return await read_file_smart(path, strategy, start_line, end_line, ctx)
+        result = await read_file_smart(path, strategy, start_line, end_line, ctx)
+        _record_metrics(
+            "tokenette_read_file",
+            {
+                "path": path,
+                "strategy": strategy,
+                "start_line": start_line,
+                "end_line": end_line,
+            },
+            result,
+            tokens_saved=_tokens_saved_from_result(result),
+        )
+        return result
 
     @mcp.tool()
     async def tokenette_write_file(
-        path: str, diff: str, ctx: Context | None = None
+        path: str,
+        diff: str,
+        ctx: Context | None = None,
+        expected_hash: str | None = None,
     ) -> dict[str, Any]:
         """
         Write file using unified diff format (97% token savings).
@@ -182,8 +273,16 @@ Use `optimize_output` to compress any response before transmission.
         Args:
             path: Target file path
             diff: Unified diff format changes
+            expected_hash: Optional file hash to verify before applying
         """
-        return await write_file_diff(path, diff, ctx)
+        result = await write_file_diff(path, diff, ctx=ctx, expected_hash=expected_hash)
+        _record_metrics(
+            "tokenette_write_file",
+            {"path": path, "diff": diff, "expected_hash": expected_hash},
+            result,
+            tokens_saved=_tokens_saved_from_result(result),
+        )
+        return result
 
     @mcp.tool()
     async def tokenette_search_code(
@@ -204,7 +303,18 @@ Use `optimize_output` to compress any response before transmission.
             file_pattern: File glob pattern
             max_results: Maximum results to return
         """
-        return await search_code_semantic(query, directory, file_pattern, max_results, ctx)
+        result = await search_code_semantic(query, directory, file_pattern, max_results, ctx)
+        _record_metrics(
+            "tokenette_search_code",
+            {
+                "query": query,
+                "directory": directory,
+                "file_pattern": file_pattern,
+                "max_results": max_results,
+            },
+            result,
+        )
+        return result
 
     @mcp.tool()
     async def tokenette_get_structure(path: str, ctx: Context | None = None) -> dict[str, Any]:
@@ -214,7 +324,9 @@ Use `optimize_output` to compress any response before transmission.
         Returns functions, classes, and methods without code bodies.
         Much smaller than full file content.
         """
-        return await get_file_structure(path, ctx)
+        result = await get_file_structure(path, ctx)
+        _record_metrics("tokenette_get_structure", {"path": path}, result)
+        return result
 
     @mcp.tool()
     async def tokenette_batch_read(paths: list[str], ctx: Context | None = None) -> dict[str, Any]:
@@ -224,7 +336,37 @@ Use `optimize_output` to compress any response before transmission.
         Automatically detects and references shared code (imports, utilities).
         Much more efficient than multiple read_file calls.
         """
-        return await batch_read_files(paths, ctx)
+        result = await batch_read_files(paths, ctx)
+        _record_metrics(
+            "tokenette_batch_read",
+            {"paths": paths},
+            result,
+            tokens_saved=_tokens_saved_from_result(result),
+        )
+        return result
+
+    @mcp.tool()
+    async def tokenette_batch_ops(
+        operations: list[dict[str, Any]], ctx: Context | None = None
+    ) -> dict[str, Any]:
+        """
+        Execute a batch of operations in a single optimized payload.
+
+        Supports operations:
+        - read: {type:"read", path, strategy?, start_line?, end_line?}
+        - write: {type:"write", path, diff? | content?}
+        - search: {type:"search", query, directory?, file_pattern?, max_results?}
+        - analyze: {type:"analyze", directory?, focus?}
+        """
+        batcher: InteractionBatcher = mcp.state["batcher"]
+        result = await batcher.batch_file_operations(operations)
+        _record_metrics(
+            "tokenette_batch_ops",
+            {"operations": operations},
+            result,
+            tokens_saved=_tokens_saved_from_result(result),
+        )
+        return result
 
     # ─── ANALYSIS TOOLS ──────────────────────────────────────────
 
@@ -239,7 +381,9 @@ Use `optimize_output` to compress any response before transmission.
             path: File or directory to analyze
             checks: Analysis checks (complexity, style, security)
         """
-        return await analyze_code(path, checks, ctx)
+        result = await analyze_code(path, checks, ctx)
+        _record_metrics("tokenette_analyze", {"path": path, "checks": checks}, result)
+        return result
 
     @mcp.tool()
     async def tokenette_find_bugs(
@@ -254,7 +398,13 @@ Use `optimize_output` to compress any response before transmission.
             path: File to scan
             severity: Filter by severity level
         """
-        return await find_bugs(path, severity, ctx)
+        result = await find_bugs(path, severity, ctx)
+        _record_metrics(
+            "tokenette_find_bugs",
+            {"path": path, "severity": severity},
+            result,
+        )
+        return result
 
     @mcp.tool()
     async def tokenette_complexity(path: str, ctx: Context | None = None) -> dict[str, Any]:
@@ -263,7 +413,9 @@ Use `optimize_output` to compress any response before transmission.
 
         Returns complexity score, LOC, nesting depth, and maintainability index.
         """
-        return await get_complexity(path, ctx)
+        result = await get_complexity(path, ctx)
+        _record_metrics("tokenette_complexity", {"path": path}, result)
+        return result
 
     # ─── CONTEXT7 / DOCUMENTATION TOOLS ──────────────────────────
 
@@ -274,7 +426,9 @@ Use `optimize_output` to compress any response before transmission.
 
         Examples: "react" → "/facebook/react"
         """
-        return await resolve_library(name, ctx)
+        result = await resolve_library(name, ctx)
+        _record_metrics("tokenette_resolve_lib", {"name": name}, result)
+        return result
 
     @mcp.tool()
     async def tokenette_get_docs(
@@ -295,7 +449,14 @@ Use `optimize_output` to compress any response before transmission.
             mode: "code" for API refs, "info" for guides
             page: Page number (1-10)
         """
-        return await fetch_library_docs(library, topic, mode, page, ctx)
+        result = await fetch_library_docs(library, topic, mode, page, ctx)
+        _record_metrics(
+            "tokenette_get_docs",
+            {"library": library, "topic": topic, "mode": mode, "page": page},
+            result,
+            tokens_saved=_tokens_saved_from_result(result),
+        )
+        return result
 
     @mcp.tool()
     async def tokenette_search_docs(
@@ -308,7 +469,13 @@ Use `optimize_output` to compress any response before transmission.
             query: Search query
             library: Optional library to search within
         """
-        return await search_library_docs(query, library, ctx)
+        result = await search_library_docs(query, library, ctx)
+        _record_metrics(
+            "tokenette_search_docs",
+            {"query": query, "library": library},
+            result,
+        )
+        return result
 
     # ─── OPTIMIZATION TOOLS ──────────────────────────────────────
 
@@ -328,12 +495,17 @@ Use `optimize_output` to compress any response before transmission.
             content_type: Content type hint
         """
         optimizer: OptimizationPipeline = mcp.state["optimizer"]
-        result = await optimizer.optimize(data, {"type": content_type})
+        result = await optimizer.optimize(data, content_type=content_type)
 
-        # Update metrics
-        mcp.state["metrics"]["tokens_saved"] += result.original_tokens - result.final_tokens
-
-        return result.to_dict()
+        response = result.to_response()
+        _record_metrics(
+            "tokenette_optimize",
+            {"content_type": content_type},
+            response,
+            tokens_saved=result.tokens_saved,
+            cache_hit=result.is_cache_hit,
+        )
+        return response
 
     @mcp.tool()
     async def tokenette_route_task(
@@ -354,8 +526,7 @@ Use `optimize_output` to compress any response before transmission.
         """
         router: TaskRouter = mcp.state["router"]
         decision = router.route(request, {"affected_files": affected_files})
-
-        return {
+        result = {
             "model": decision.model,
             "complexity": decision.complexity.name,
             "category": decision.category.value,
@@ -365,6 +536,14 @@ Use `optimize_output` to compress any response before transmission.
             "fallback_chain": decision.fallback_chain,
             "reasoning": decision.reasoning,
         }
+        metrics: MetricsTracker = mcp.state["metrics"]
+        metrics.record_model_use(decision.model, decision.multiplier)
+        _record_metrics(
+            "tokenette_route_task",
+            {"request": request, "affected_files": affected_files},
+            result,
+        )
+        return result
 
     @mcp.tool()
     async def tokenette_amplify(
@@ -392,19 +571,35 @@ Use `optimize_output` to compress any response before transmission.
             cat = router._detect_category(prompt)
             category = cat.value
 
+        # Normalize category to TaskCategory
+        from tokenette.core.router import TaskCategory
+
+        try:
+            category_enum = TaskCategory(category)
+        except Exception:
+            category_enum = TaskCategory.GENERATION
+
         # Get boosters if not provided
         if boosters is None:
             boosters = ["expert_role_framing", "chain_of_thought_injection"]
 
-        result = amplifier.amplify(prompt, boosters, category, {})
+        result = amplifier.amplify(prompt, boosters, category_enum, {})
 
-        return {
+        response = {
             "original_length": len(prompt),
-            "amplified_length": len(result.enhanced_prompt),
+            "amplified_length": result.amplified_length,
             "boosters_applied": result.boosters_applied,
-            "enhanced_prompt": result.enhanced_prompt,
-            "quality_boost": result.estimated_quality_boost,
+            "enhanced_prompt": result.prompt,
+            "quality_boost": amplifier.estimate_quality_improvement(
+                result.boosters_applied, base_quality=0.85
+            ),
         }
+        _record_metrics(
+            "tokenette_amplify",
+            {"category": category_enum.value, "boosters": boosters},
+            response,
+        )
+        return response
 
     @mcp.tool()
     async def tokenette_metrics(ctx: Context | None = None) -> dict[str, Any]:
@@ -415,16 +610,12 @@ Use `optimize_output` to compress any response before transmission.
         """
         cache: MultiLayerCache = mcp.state["cache"]
         router: TaskRouter = mcp.state["router"]
-        metrics = mcp.state["metrics"]
+        metrics: MetricsTracker = mcp.state["metrics"]
         cache_stats = cache.get_stats()
         budget = router.budget_tracker
 
-        return {
-            "session": {
-                "requests": metrics["requests"],
-                "tokens_saved": metrics["tokens_saved"],
-                "cache_hits": metrics["cache_hits"],
-            },
+        result = {
+            "session": metrics.snapshot(),
             "cache": {
                 "l1_entries": cache_stats.get("l1_entries", 0),
                 "l2_entries": cache_stats.get("l2_entries", 0),
@@ -436,6 +627,8 @@ Use `optimize_output` to compress any response before transmission.
                 "usage_pct": budget.usage_pct,
             },
         }
+        _record_metrics("tokenette_metrics", None, result)
+        return result
 
     # ─── GIT TOOLS ───────────────────────────────────────────────
 
@@ -460,7 +653,7 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.git_ops import get_git_diff
 
         result = await get_git_diff(path, staged, context_lines, True, files)
-        return {
+        response = {
             "files_changed": result.files_changed,
             "insertions": result.insertions,
             "deletions": result.deletions,
@@ -468,6 +661,13 @@ Use `optimize_output` to compress any response before transmission.
             "summary": result.summary,
             "tokens_saved": result.tokens_saved,
         }
+        _record_metrics(
+            "tokenette_git_diff",
+            {"path": path, "staged": staged, "context_lines": context_lines, "files": files},
+            response,
+            tokens_saved=result.tokens_saved,
+        )
+        return response
 
     @mcp.tool()
     async def tokenette_git_status(path: str = ".") -> dict[str, Any]:
@@ -481,7 +681,9 @@ Use `optimize_output` to compress any response before transmission.
         """
         from .tools.git_ops import get_git_status
 
-        return await get_git_status(path)
+        result = await get_git_status(path)
+        _record_metrics("tokenette_git_status", {"path": path}, result)
+        return result
 
     @mcp.tool()
     async def tokenette_git_history(
@@ -502,12 +704,23 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.git_ops import get_git_history
 
         result = await get_git_history(path, max_commits, file_path, author)
-        return {
+        response = {
             "commits": result.commits,
             "total": result.total_commits,
             "date_range": result.date_range,
             "summary": result.summary,
         }
+        _record_metrics(
+            "tokenette_git_history",
+            {
+                "path": path,
+                "max_commits": max_commits,
+                "file_path": file_path,
+                "author": author,
+            },
+            response,
+        )
+        return response
 
     @mcp.tool()
     async def tokenette_git_blame(
@@ -524,12 +737,18 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.git_ops import get_git_blame
 
         result = await get_git_blame(file_path, start_line, end_line)
-        return {
+        response = {
             "file": result.file,
             "lines": result.lines,
             "authors": result.authors,
             "summary": result.summary,
         }
+        _record_metrics(
+            "tokenette_git_blame",
+            {"file_path": file_path, "start_line": start_line, "end_line": end_line},
+            response,
+        )
+        return response
 
     # ─── PROMPT TOOLS ────────────────────────────────────────────
 
@@ -546,7 +765,9 @@ Use `optimize_output` to compress any response before transmission.
         """
         from .tools.prompts import list_templates
 
-        return list_templates(category)
+        result = list_templates(category)
+        _record_metrics("tokenette_list_prompts", {"category": category}, result)
+        return result
 
     @mcp.tool()
     async def tokenette_build_prompt(
@@ -566,12 +787,18 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.prompts import build_prompt
 
         result = build_prompt(template_name, variables, quality_boosters)
-        return {
+        response = {
             "prompt": result.prompt,
             "template": result.template_name,
             "token_count": result.token_count,
             "boosters_applied": result.quality_boosters,
         }
+        _record_metrics(
+            "tokenette_build_prompt",
+            {"template_name": template_name, "variables": variables},
+            response,
+        )
+        return response
 
     # ─── TOKEN & BUDGET TOOLS ────────────────────────────────────
 
@@ -590,11 +817,17 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.tokens import count_tokens
 
         result = count_tokens(text, language, detailed)
-        return {
+        response = {
             "text_length": result.text_length,
             "estimated_tokens": result.estimated_tokens,
             "breakdown": result.breakdown,
         }
+        _record_metrics(
+            "tokenette_count_tokens",
+            {"language": language, "detailed": detailed},
+            response,
+        )
+        return response
 
     @mcp.tool()
     async def tokenette_estimate_cost(
@@ -611,7 +844,7 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.tokens import estimate_cost
 
         result = estimate_cost(model, input_text, output_estimate)
-        return {
+        response = {
             "model": result.model,
             "input_tokens": result.input_tokens,
             "output_estimate": result.output_tokens_estimate,
@@ -619,6 +852,12 @@ Use `optimize_output` to compress any response before transmission.
             "premium_cost": result.premium_requests_cost,
             "breakdown": result.breakdown,
         }
+        _record_metrics(
+            "tokenette_estimate_cost",
+            {"model": model, "output_estimate": output_estimate},
+            response,
+        )
+        return response
 
     @mcp.tool()
     async def tokenette_compare_models(
@@ -635,7 +874,13 @@ Use `optimize_output` to compress any response before transmission.
         """
         from .tools.tokens import compare_model_costs
 
-        return compare_model_costs(input_text, output_estimate)
+        result = compare_model_costs(input_text, output_estimate)
+        _record_metrics(
+            "tokenette_compare_models",
+            {"output_estimate": output_estimate},
+            result,
+        )
+        return result
 
     @mcp.tool()
     async def tokenette_budget_status() -> dict[str, Any]:
@@ -648,7 +893,7 @@ Use `optimize_output` to compress any response before transmission.
 
         tracker = get_budget_tracker()
         status = tracker.get_status()
-        return {
+        response = {
             "monthly_limit": status.monthly_limit,
             "used": status.used,
             "remaining": status.remaining,
@@ -658,6 +903,8 @@ Use `optimize_output` to compress any response before transmission.
             "on_track": status.on_track,
             "recommendations": status.recommendations,
         }
+        _record_metrics("tokenette_budget_status", None, response)
+        return response
 
     # ─── WORKSPACE TOOLS ─────────────────────────────────────────
 
@@ -674,7 +921,7 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.workspace import detect_project_type
 
         result = await detect_project_type(path)
-        return {
+        response = {
             "name": result.name,
             "type": result.type,
             "language": result.language,
@@ -684,6 +931,8 @@ Use `optimize_output` to compress any response before transmission.
             "dependencies_count": len(result.dependencies),
             "scripts": result.scripts,
         }
+        _record_metrics("tokenette_project_info", {"path": path}, response)
+        return response
 
     @mcp.tool()
     async def tokenette_workspace_summary(path: str = ".", max_depth: int = 4) -> dict[str, Any]:
@@ -699,7 +948,7 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.workspace import get_workspace_summary
 
         result = await get_workspace_summary(path, max_depth)
-        return {
+        response = {
             "total_files": result.total_files,
             "total_lines": result.total_lines,
             "languages": result.languages,
@@ -708,6 +957,12 @@ Use `optimize_output` to compress any response before transmission.
             "token_estimate": result.token_estimate,
             "summary": result.summary_text,
         }
+        _record_metrics(
+            "tokenette_workspace_summary",
+            {"path": path, "max_depth": max_depth},
+            response,
+        )
+        return response
 
     @mcp.tool()
     async def tokenette_code_health(path: str = ".") -> dict[str, Any]:
@@ -722,7 +977,7 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.workspace import get_code_health
 
         result = await get_code_health(path)
-        return {
+        response = {
             "files_analyzed": result.files_analyzed,
             "total_lines": result.total_lines,
             "code_lines": result.code_lines,
@@ -731,6 +986,8 @@ Use `optimize_output` to compress any response before transmission.
             "largest_files": result.largest_files[:5],
             "recommendations": result.recommendations,
         }
+        _record_metrics("tokenette_code_health", {"path": path}, response)
+        return response
 
     @mcp.tool()
     async def tokenette_smart_context(
@@ -749,7 +1006,13 @@ Use `optimize_output` to compress any response before transmission.
         """
         from .tools.workspace import extract_smart_context
 
-        return await extract_smart_context(path, query, max_tokens)
+        result = await extract_smart_context(path, query, max_tokens)
+        _record_metrics(
+            "tokenette_smart_context",
+            {"path": path, "query": query, "max_tokens": max_tokens},
+            result,
+        )
+        return result
 
     @mcp.tool()
     async def tokenette_dependencies(path: str = ".") -> dict[str, Any]:
@@ -762,12 +1025,14 @@ Use `optimize_output` to compress any response before transmission.
         from .tools.workspace import analyze_dependencies
 
         result = await analyze_dependencies(path)
-        return {
+        response = {
             "direct": result.direct,
             "dev": result.dev,
             "total": result.total_count,
             "tree": result.dependency_tree,
         }
+        _record_metrics("tokenette_dependencies", {"path": path}, response)
+        return response
 
     # ─── REGISTER RESOURCES ──────────────────────────────────────
 

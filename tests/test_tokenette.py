@@ -250,6 +250,56 @@ class TestOptimizer:
         assert hasattr(result, "quality_score")
 
 
+# ─── METRICS TESTS ───────────────────────────────────────────────
+
+
+class TestMetrics:
+    """Test metrics tracking."""
+
+    def test_metrics_tracker_records(self, tmp_path):
+        """Metrics tracker should record tool calls."""
+        from tokenette.config import MetricsConfig
+        from tokenette.core.metrics import MetricsTracker
+
+        cfg = MetricsConfig(persist_metrics=False, metrics_file=tmp_path / "metrics.json")
+        tracker = MetricsTracker(cfg)
+
+        tracker.record_tool_call(
+            "tokenette_read_file",
+            input_data={"path": "a.py"},
+            output_data={"status": "ok"},
+            tokens_saved=10,
+            cache_hit=True,
+        )
+
+        snapshot = tracker.snapshot()
+        assert snapshot["totals"]["calls"] == 1
+        assert snapshot["totals"]["tokens_saved"] >= 10
+        assert snapshot["totals"]["cache_hits"] == 1
+
+
+# ─── BATCHER TESTS ───────────────────────────────────────────────
+
+
+class TestBatcher:
+    """Test interaction batching engine."""
+
+    @pytest.mark.asyncio
+    async def test_batch_read(self, tmp_path):
+        from tokenette.core.batcher import InteractionBatcher
+
+        file = tmp_path / "demo.py"
+        file.write_text("def hello():\n    return 'world'\n")
+
+        batcher = InteractionBatcher()
+        result = await batcher.batch_file_operations(
+            [{"type": "read", "path": str(file), "strategy": "full"}]
+        )
+
+        assert "payload" in result
+        assert "tokens" in result
+
+
 # ─── FILE OPS TESTS ──────────────────────────────────────────────
 
 
@@ -382,7 +432,7 @@ class TestIntegration:
             __version__,
         )
 
-        assert __version__ == "2.0.0"
+        assert __version__ == "2.0.1"
 
     def test_server_creation(self):
         """Test server can be created."""

@@ -23,7 +23,9 @@ For CLI usage:
 from tokenette.config import TokenetteConfig, get_config
 from tokenette.core.amplifier import QualityAmplifier
 from tokenette.core.cache import MultiLayerCache
+from tokenette.core.metrics import MetricsTracker
 from tokenette.core.compressor import SemanticCompressor
+from tokenette.core.batcher import InteractionBatcher
 from tokenette.core.minifier import MinificationEngine
 from tokenette.core.optimizer import OptimizationPipeline
 from tokenette.core.router import Complexity, TaskCategory, TaskRouter
@@ -36,7 +38,7 @@ def _get_server():
     return mcp, create_server
 
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 __author__ = "Adarsh"
 __license__ = "MIT"
 
@@ -49,6 +51,8 @@ __all__ = [
     "MinificationEngine",
     "SemanticCompressor",
     "OptimizationPipeline",
+    "MetricsTracker",
+    "InteractionBatcher",
     "TaskRouter",
     "Complexity",
     "TaskCategory",

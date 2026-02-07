@@ -22,6 +22,15 @@ from diskcache import Cache as DiskCache
 
 from tokenette.config import CacheConfig
 
+try:
+    from sentence_transformers import SentenceTransformer, util as st_util
+
+    HAS_VECTOR = True
+except Exception:
+    SentenceTransformer = None  # type: ignore[assignment]
+    st_util = None  # type: ignore[assignment]
+    HAS_VECTOR = False
+
 T = TypeVar("T")
 
 
@@ -109,6 +118,7 @@ class MultiLayerCache:
         # L4: Semantic cache (optional, requires vector dependencies)
         self._l4_index: list[dict[str, Any]] = []
         self._l4_enabled = self.config.l4_enabled
+        self._vector_model: SentenceTransformer | None = None
 
         # Metrics
         self._stats = {
@@ -312,7 +322,26 @@ class MultiLayerCache:
         if not self._l4_index:
             return None
 
-        # Simple keyword-based fallback (full vector search requires numpy)
+        # Vector-based similarity if available
+        model = self._get_vector_model()
+        if model is not None:
+            try:
+                query_emb = model.encode(query, normalize_embeddings=True)
+                best_match = None
+                best_score = 0.0
+                for entry in self._l4_index:
+                    emb = entry.get("embedding")
+                    if emb is None:
+                        continue
+                    score = float(st_util.cos_sim(query_emb, emb)[0][0])
+                    if score > best_score and score >= self.config.l4_similarity_threshold:
+                        best_score = score
+                        best_match = entry.get("data")
+                return best_match
+            except Exception:
+                pass
+
+        # Keyword-based fallback
         query_words = set(query.lower().split())
         best_match = None
         best_score = 0.0
@@ -322,7 +351,6 @@ class MultiLayerCache:
             if not entry_words:
                 continue
 
-            # Jaccard similarity
             intersection = len(query_words & entry_words)
             union = len(query_words | entry_words)
             score = intersection / union if union > 0 else 0.0
@@ -333,9 +361,23 @@ class MultiLayerCache:
 
         return best_match
 
+    def _get_vector_model(self) -> SentenceTransformer | None:
+        if not self._l4_enabled or not HAS_VECTOR:
+            return None
+        if self._vector_model is None:
+            self._vector_model = SentenceTransformer("all-MiniLM-L6-v2")
+        return self._vector_model
+
     async def _index_semantic(self, key: str, data: Any) -> None:
         """Add entry to semantic index."""
-        self._l4_index.append({"key": key, "data": data, "indexed_at": time.time()})
+        entry: dict[str, Any] = {"key": key, "data": data, "indexed_at": time.time()}
+        model = self._get_vector_model()
+        if model is not None:
+            try:
+                entry["embedding"] = model.encode(key, normalize_embeddings=True)
+            except Exception:
+                pass
+        self._l4_index.append(entry)
 
         # Cleanup old entries
         cutoff = time.time() - self.config.l4_ttl_seconds
@@ -372,6 +414,10 @@ class MultiLayerCache:
 
         return count
 
+    def get_stats(self) -> dict[str, Any]:
+        """Backward-compatible stats accessor."""
+        return self.stats
+
     async def clear(self) -> None:
         """Clear all cache layers."""
         self._l1.clear()
@@ -381,6 +427,13 @@ class MultiLayerCache:
             self._l3.clear()
         self._l4_index.clear()
         self._stats = dict.fromkeys(self._stats, 0)
+
+    async def close(self) -> None:
+        """Close cache backends (disk caches)."""
+        if self._l2 is not None:
+            self._l2.close()
+        if self._l3 is not None:
+            self._l3.close()
 
     @property
     def stats(self) -> dict[str, Any]:
@@ -400,6 +453,8 @@ class MultiLayerCache:
             "total_hits": total_hits,
             "total_requests": total_requests,
             "hit_rate": total_hits / total_requests if total_requests > 0 else 0.0,
-            "l1_size": len(self._l1),
-            "l4_index_size": len(self._l4_index),
+            "l1_entries": len(self._l1),
+            "l2_entries": len(self._l2) if self._l2 is not None else 0,
+            "l3_entries": len(self._l3) if self._l3 is not None else 0,
+            "l4_entries": len(self._l4_index),
         }

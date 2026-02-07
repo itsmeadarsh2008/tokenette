@@ -116,7 +116,7 @@ class Context7Client:
         # Check local cache first
         cache_key = f"lib_resolve:{name.lower()}"
         cached = await self.cache.get(cache_key)
-        if cached:
+        if cached and cached.hit:
             return LibraryInfo(**cached.data)
 
         # Check if it's already a full ID (e.g., "/facebook/react")
@@ -144,7 +144,7 @@ class Context7Client:
             await self.cache.set(
                 cache_key,
                 lib_info.to_dict(),
-                ttl=3600 * 24,  # Cache for 24 hours
+                ttl_seconds=3600 * 24,  # Cache for 24 hours
             )
 
             return lib_info
@@ -179,7 +179,7 @@ class Context7Client:
 
         # Check cache
         cached = await self.cache.get(cache_key)
-        if cached:
+        if cached and cached.hit:
             return DocResult(
                 library_id=library_id,
                 topic=topic,
@@ -218,7 +218,7 @@ class Context7Client:
             await self.cache.set(
                 cache_key,
                 {"content": compressed_content, "tokens_original": tokens_original},
-                ttl=3600 * 4,  # Cache for 4 hours
+                ttl_seconds=3600 * 4,  # Cache for 4 hours
             )
 
             return DocResult(

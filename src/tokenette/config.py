@@ -130,7 +130,7 @@ class ServerConfig(BaseModel):
     """MCP Server settings."""
 
     name: str = "Tokenette"
-    version: str = "2.0.0"
+    version: str = "2.0.1"
     transport: Literal["stdio", "sse", "http"] = "stdio"
     host: str = "127.0.0.1"
     port: int = 8765

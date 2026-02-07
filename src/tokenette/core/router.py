@@ -427,6 +427,11 @@ class TaskRouter:
         self.budget = BudgetTracker(self.config.monthly_premium_limit)
         self.learner = AdaptiveLearner(self.config.min_samples_for_learning)
 
+    @property
+    def budget_tracker(self) -> BudgetTracker:
+        """Backward-compatible alias for budget tracking."""
+        return self.budget
+
     def route(self, request: str, workspace: dict[str, Any] | None = None) -> RoutingDecision:
         """
         Route a task to the optimal model.

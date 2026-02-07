@@ -25,7 +25,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from .config import TokenetteConfig, get_config
-from .core import MultiLayerCache, TaskRouter
+from .core import MetricsTracker, MultiLayerCache, TaskRouter
 
 app = typer.Typer(
     name="tokenette",
@@ -102,6 +102,7 @@ def metrics(format: Annotated[str, typer.Option(help="Output format: table, json
     # Initialize components for stats
     cache = MultiLayerCache(config.cache)
     router = TaskRouter(config.router)
+    metrics = MetricsTracker(config.metrics)
 
     if format == "json":
         data = {
@@ -111,10 +112,12 @@ def metrics(format: Annotated[str, typer.Option(help="Output format: table, json
                 "used": router.budget_tracker.used,
                 "remaining": router.budget_tracker.remaining,
             },
+            "metrics": metrics.snapshot(),
             "config": {
-                "cache_l1_size": config.cache.l1_max_size,
-                "cache_l2_size": config.cache.l2_max_size,
-                "compression_min_size": config.compression.min_size,
+                "cache_l1_size_mb": config.cache.l1_max_size_mb,
+                "cache_l2_size_mb": config.cache.l2_max_size_mb,
+                "compression_large_text_threshold": config.compression.large_text_threshold,
+                "toon_min_items": config.compression.toon_min_items,
             },
         }
         console.print_json(json.dumps(data))
@@ -139,6 +142,21 @@ def metrics(format: Annotated[str, typer.Option(help="Output format: table, json
         "Budget Remaining", f"{router.budget_tracker.remaining:.1f}", "Premium requests left"
     )
     table.add_row("Budget %", f"{router.budget_tracker.usage_pct:.1f}%", "Monthly usage")
+
+    # Token savings
+    snapshot = metrics.snapshot()
+    totals = snapshot.get("totals", {})
+    table.add_row("", "", "")
+    table.add_row(
+        "Tokens Saved",
+        f"{totals.get('tokens_saved', 0):,}",
+        "Estimated tokens saved",
+    )
+    table.add_row(
+        "Tool Calls",
+        f"{totals.get('calls', 0):,}",
+        "Total tool invocations",
+    )
 
     console.print(table)
 

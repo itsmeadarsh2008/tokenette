@@ -59,6 +59,28 @@ class ToolDetails:
 
 # Tool registry - lightweight metadata for discovery
 TOOL_REGISTRY: dict[str, ToolMetadata] = {
+    # Meta tools
+    "discover_tools": ToolMetadata(
+        name="discover_tools",
+        description="Discover available tools with minimal metadata",
+        category="meta",
+        popularity=1000,
+        tags=["meta", "discover", "tools"],
+    ),
+    "get_tool_details": ToolMetadata(
+        name="get_tool_details",
+        description="Get full schema for a specific tool",
+        category="meta",
+        popularity=800,
+        tags=["meta", "schema", "details"],
+    ),
+    "execute_tool": ToolMetadata(
+        name="execute_tool",
+        description="Execute a tool dynamically via the registry",
+        category="meta",
+        popularity=700,
+        tags=["meta", "execute", "tool"],
+    ),
     # File Operations
     "read_file_smart": ToolMetadata(
         name="read_file_smart",
@@ -94,6 +116,13 @@ TOOL_REGISTRY: dict[str, ToolMetadata] = {
         category="file",
         popularity=280,
         tags=["batch", "read", "files"],
+    ),
+    "batch_ops": ToolMetadata(
+        name="batch_ops",
+        description="Execute batched file operations (read/write/search/analyze) in one payload",
+        category="file",
+        popularity=260,
+        tags=["batch", "ops", "read", "write", "search"],
     ),
     # Analysis
     "analyze_code": ToolMetadata(
@@ -151,6 +180,58 @@ TOOL_REGISTRY: dict[str, ToolMetadata] = {
 
 # Full tool schemas (loaded on demand)
 TOOL_SCHEMAS: dict[str, ToolDetails] = {
+    "discover_tools": ToolDetails(
+        name="discover_tools",
+        description="Discover available tools with minimal metadata.",
+        category="meta",
+        parameters={
+            "category": {"type": "string", "description": "Filter by category"},
+            "query": {"type": "string", "description": "Search query"},
+            "limit": {"type": "integer", "default": 10, "description": "Max tools to return"},
+        },
+        returns="List of tools with minimal metadata",
+        examples=[{"input": {"category": "file"}, "description": "List file tools"}],
+    ),
+    "get_tool_details": ToolDetails(
+        name="get_tool_details",
+        description="Get full schema for a specific tool.",
+        category="meta",
+        parameters={
+            "tool_name": {"type": "string", "description": "Tool name", "required": True},
+            "include_examples": {
+                "type": "boolean",
+                "default": True,
+                "description": "Include example usage",
+            },
+        },
+        returns="Full tool schema",
+        examples=[{"input": {"tool_name": "tokenette_read_file"}, "description": "Tool schema"}],
+    ),
+    "execute_tool": ToolDetails(
+        name="execute_tool",
+        description="Execute a tool dynamically via the registry.",
+        category="meta",
+        parameters={
+            "tool_name": {"type": "string", "description": "Tool name", "required": True},
+            "arguments": {"type": "object", "description": "Tool arguments", "required": True},
+            "cache_key": {"type": "string", "description": "Optional cache key"},
+            "skip_cache": {
+                "type": "boolean",
+                "default": False,
+                "description": "Skip cache lookup",
+            },
+        },
+        returns="Tool result (optionally optimized)",
+        examples=[
+            {
+                "input": {
+                    "tool_name": "tokenette_read_file",
+                    "arguments": {"path": "README.md"},
+                },
+                "description": "Execute read file",
+            }
+        ],
+    ),
     "read_file_smart": ToolDetails(
         name="read_file_smart",
         description=(
@@ -199,6 +280,10 @@ TOOL_SCHEMAS: dict[str, ToolDetails] = {
                 "type": "boolean",
                 "default": True,
                 "description": "Verify file hash before applying",
+            },
+            "expected_hash": {
+                "type": "string",
+                "description": "Optional file hash to verify against",
             },
         },
         returns="Result of the write operation",
@@ -304,6 +389,34 @@ TOOL_SCHEMAS: dict[str, ToolDetails] = {
             }
         ],
     ),
+    "batch_ops": ToolDetails(
+        name="batch_ops",
+        description=(
+            "Execute batched operations (read/write/search/analyze) in a single "
+            "payload with minification and deduplication."
+        ),
+        category="file",
+        parameters={
+            "operations": {
+                "type": "array",
+                "items": {"type": "object"},
+                "description": "List of operations with type and parameters",
+                "required": True,
+            }
+        },
+        returns="Minified batch payload with results",
+        examples=[
+            {
+                "input": {
+                    "operations": [
+                        {"type": "read", "path": "src/app.py"},
+                        {"type": "search", "query": "auth", "directory": "src"},
+                    ]
+                },
+                "description": "Read + search in one batch",
+            }
+        ],
+    ),
     "analyze_code": ToolDetails(
         name="analyze_code",
         description="Analyze code for patterns, complexity, and potential issues.",
@@ -404,6 +517,14 @@ TOOL_SCHEMAS: dict[str, ToolDetails] = {
 }
 
 
+def _prefix_tool_name(name: str) -> str:
+    return name if name.startswith("tokenette_") else f"tokenette_{name}"
+
+
+def _strip_tool_prefix(name: str) -> str:
+    return name.replace("tokenette_", "", 1) if name.startswith("tokenette_") else name
+
+
 async def discover_tools(
     category: str | None = None,
     query: str | None = None,
@@ -442,7 +563,9 @@ async def discover_tools(
             if not matches:
                 continue
 
-        results.append(metadata.to_dict())
+        tool_dict = metadata.to_dict()
+        tool_dict["name"] = _prefix_tool_name(name)
+        results.append(tool_dict)
 
     # Sort by popularity
     results.sort(key=lambda x: x.get("pop", 0), reverse=True)
@@ -474,11 +597,16 @@ async def get_tool_details(
     Returns:
         Full tool schema with parameters
     """
-    if tool_name not in TOOL_SCHEMAS:
-        return {"error": f"Tool '{tool_name}' not found", "available": list(TOOL_REGISTRY.keys())}
+    lookup_name = _strip_tool_prefix(tool_name)
+    if lookup_name not in TOOL_SCHEMAS:
+        return {
+            "error": f"Tool '{tool_name}' not found",
+            "available": [_prefix_tool_name(n) for n in TOOL_REGISTRY.keys()],
+        }
 
-    schema = TOOL_SCHEMAS[tool_name]
+    schema = TOOL_SCHEMAS[lookup_name]
     result = schema.to_dict()
+    result["name"] = _prefix_tool_name(schema.name)
 
     if not include_examples:
         result.pop("examples", None)
@@ -508,14 +636,20 @@ async def execute_tool(
     Returns:
         Optimized tool result
     """
-    if tool_name not in TOOL_REGISTRY:
-        return {"error": f"Tool '{tool_name}' not found", "available": list(TOOL_REGISTRY.keys())}
+    lookup_name = _strip_tool_prefix(tool_name)
+    if lookup_name not in TOOL_REGISTRY:
+        return {
+            "error": f"Tool '{tool_name}' not found",
+            "available": [_prefix_tool_name(n) for n in TOOL_REGISTRY.keys()],
+        }
 
     # Import tools dynamically to avoid circular imports
     from tokenette.tools import analysis, file_ops
 
     # Tool dispatch map
     tool_functions: dict[str, Callable[..., Any]] = {
+        "discover_tools": discover_tools,
+        "get_tool_details": get_tool_details,
         "read_file_smart": file_ops.read_file_smart,
         "write_file_diff": file_ops.write_file_diff,
         "search_code_semantic": file_ops.search_code_semantic,
@@ -526,18 +660,24 @@ async def execute_tool(
         "get_complexity": analysis.get_complexity,
     }
 
-    if tool_name not in tool_functions:
+    if lookup_name == "batch_ops":
+        from tokenette.core.batcher import InteractionBatcher
+
+        batcher = InteractionBatcher()
+        return await batcher.batch_file_operations(arguments.get("operations", []))
+
+    if lookup_name not in tool_functions:
         return {"error": f"Tool '{tool_name}' not yet implemented", "status": "pending"}
 
     # Execute tool
-    func = tool_functions[tool_name]
+    func = tool_functions[lookup_name]
 
     try:
         result = await func(**arguments, ctx=ctx)
 
         # Update popularity
-        TOOL_REGISTRY[tool_name].popularity += 1
+        TOOL_REGISTRY[lookup_name].popularity += 1
 
-        return {"status": "success", "tool": tool_name, "result": result}
+        return {"status": "success", "tool": _prefix_tool_name(lookup_name), "result": result}
     except Exception as e:
-        return {"status": "error", "tool": tool_name, "error": str(e)}
+        return {"status": "error", "tool": _prefix_tool_name(lookup_name), "error": str(e)}
