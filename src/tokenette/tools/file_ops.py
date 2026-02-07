@@ -185,10 +185,7 @@ async def read_file_smart(
 
     # Execute strategy
     if strategy == "full":
-        if (
-            config.compression.stream_large_responses
-            and file_size > STRATEGY_THRESHOLDS["summary"]
-        ):
+        if config.compression.stream_large_responses and file_size > STRATEGY_THRESHOLDS["summary"]:
             content = await _read_stream(file_path)
             strategy = "stream"
         else:
@@ -248,17 +245,13 @@ async def _read_stream(path: Path, chunk_size: int = STREAM_CHUNK_SIZE) -> dict[
     async with aiofiles.open(path, encoding="utf-8", errors="replace") as f:
         content = await f.read()
 
-    chunks = [
-        content[i : i + chunk_size] for i in range(0, len(content), chunk_size) if content
-    ]
+    chunks = [content[i : i + chunk_size] for i in range(0, len(content), chunk_size) if content]
 
     return {
         "stream": True,
         "chunk_size": chunk_size,
         "total_chunks": len(chunks),
-        "chunks": [
-            {"index": idx, "content": chunk} for idx, chunk in enumerate(chunks, start=1)
-        ],
+        "chunks": [{"index": idx, "content": chunk} for idx, chunk in enumerate(chunks, start=1)],
     }
 
 
@@ -619,8 +612,7 @@ async def search_code_semantic(
         dirs[:] = [
             d
             for d in dirs
-            if d
-            not in {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+            if d not in {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
         ]
 
         for file in files:
