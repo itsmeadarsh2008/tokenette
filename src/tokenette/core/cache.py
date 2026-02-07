@@ -12,6 +12,7 @@ Achieves 99.8% token savings on repeated data access.
 
 from __future__ import annotations
 
+import contextlib
 import time
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
@@ -23,7 +24,8 @@ from diskcache import Cache as DiskCache
 from tokenette.config import CacheConfig
 
 try:
-    from sentence_transformers import SentenceTransformer, util as st_util
+    from sentence_transformers import SentenceTransformer
+    from sentence_transformers import util as st_util
 
     HAS_VECTOR = True
 except Exception:
@@ -373,10 +375,8 @@ class MultiLayerCache:
         entry: dict[str, Any] = {"key": key, "data": data, "indexed_at": time.time()}
         model = self._get_vector_model()
         if model is not None:
-            try:
+            with contextlib.suppress(Exception):
                 entry["embedding"] = model.encode(key, normalize_embeddings=True)
-            except Exception:
-                pass
         self._l4_index.append(entry)
 
         # Cleanup old entries

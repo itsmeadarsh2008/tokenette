@@ -20,16 +20,17 @@ from pathlib import Path
 from typing import Any, Literal
 
 import aiofiles
+from fastmcp import Context
 
 try:
-    from sentence_transformers import SentenceTransformer, util as st_util
+    from sentence_transformers import SentenceTransformer
+    from sentence_transformers import util as st_util
 
     HAS_VECTOR = True
 except Exception:
     SentenceTransformer = None  # type: ignore[assignment]
     st_util = None  # type: ignore[assignment]
     HAS_VECTOR = False
-from fastmcp import Context
 
 from tokenette.config import get_config
 from tokenette.core.minifier import MinificationEngine

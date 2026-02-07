@@ -601,7 +601,7 @@ async def get_tool_details(
     if lookup_name not in TOOL_SCHEMAS:
         return {
             "error": f"Tool '{tool_name}' not found",
-            "available": [_prefix_tool_name(n) for n in TOOL_REGISTRY.keys()],
+            "available": [_prefix_tool_name(n) for n in TOOL_REGISTRY],
         }
 
     schema = TOOL_SCHEMAS[lookup_name]
@@ -640,7 +640,7 @@ async def execute_tool(
     if lookup_name not in TOOL_REGISTRY:
         return {
             "error": f"Tool '{tool_name}' not found",
-            "available": [_prefix_tool_name(n) for n in TOOL_REGISTRY.keys()],
+            "available": [_prefix_tool_name(n) for n in TOOL_REGISTRY],
         }
 
     # Import tools dynamically to avoid circular imports

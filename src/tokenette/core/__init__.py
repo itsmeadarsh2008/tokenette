@@ -14,8 +14,8 @@ from tokenette.core.amplifier import QualityAmplifier
 from tokenette.core.batcher import InteractionBatcher
 from tokenette.core.cache import MultiLayerCache
 from tokenette.core.compressor import SemanticCompressor
-from tokenette.core.minifier import MinificationEngine
 from tokenette.core.metrics import MetricsTracker
+from tokenette.core.minifier import MinificationEngine
 from tokenette.core.optimizer import OptimizationPipeline
 from tokenette.core.router import Complexity, RoutingDecision, TaskCategory, TaskRouter
 

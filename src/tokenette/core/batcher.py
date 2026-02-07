@@ -15,7 +15,6 @@ from tokenette.core.minifier import MinificationEngine
 from tokenette.tools.file_ops import read_file_smart, search_code_semantic, write_file_diff
 from tokenette.tools.workspace import extract_smart_context, get_workspace_summary
 
-
 OperationType = Literal["read", "write", "search", "analyze"]
 
 
